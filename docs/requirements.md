@@ -248,31 +248,31 @@ Optimized list component for React Native.
 npm install moment
 npm install libphonenumber-js
 
-<!-- expo location -->
+{/* expo location */}
 
 npx expo install expo-location
 
-<!-- react native blurview -->
+{/* react native blurview */}
 
 npm install @danielsaraldi/react-native-blur-view
 
-<!-- supabase sdk -->
+{/* supabase sdk */}
 
 npx expo install @supabase/supabase-js
 
-<!-- react native skia -->
+{/* react native skia */}
 
 npx expo install @shopify/react-native-skia
 
-<!-- portal -->
+{/* portal */}
 
 npm i @gorhom/portal
 
-<!-- watermelon db -->
+{/* watermelon db */}
 
 npm install @nozbe/watermelondb
 
-<!-- clip board -->
+{/* clip board */}
 
 npx expo install expo-clipboard
 
@@ -284,11 +284,11 @@ npx expo install react-native-fast-confetti
 
 npx expo install expo-camera
 
-<!-- required for supabase -->
+{/* required for supabase */}
 
 npx expo install react-native-url-polyfill
 
-<!-- oauth -->
+{/* oauth */}
 
 npx expo install expo-apple-authentication
 npm i @react-native-google-signin/google-signin@latest
