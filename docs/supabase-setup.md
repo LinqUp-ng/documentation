@@ -1,65 +1,85 @@
-# Supabase Core Infrastructure
+# Supabase Infrastructure & configuration
 
-LinqUp uses **Supabase** as its unified backend provider, leveraging the full power of PostgreSQL, Realtime, and Edge Functions to handle complex dating and social logic entirely on the server side.
-
----
-
-## 🏗️ Database Architecture
-
-The system is built on a relational PostgreSQL schema with strict **Row Level Security (RLS)** to ensure user privacy and data integrity.
-
-### 👥 User & Profiles
-*   **`profiles`**: Extends the default `auth.users`. Stores core dating data such as `elo_rating`, `gender`, `sexual_orientation`, and `interests`.
-*   **`user_preference_filters`**: Stores the user's discovery preferences (age range, distance, etc.) and calculated metrics like `avg_daily_swipes`.
-
-### 💘 Recommendations & Matching
-*   **`recommended_profiles`**: The central queue for the "Explore" deck. 
-    *   `reaction`: Stores `'liked'`, `'rejected'`, or `NULL` (unseen).
-    *   `profile_elo_at_time`: Snapshot of the recommended user's ELO when the recommendation was generated.
-*   **`matches`**: Created when two users have a mutual `'liked'` reaction.
-*   **`match_participants`**: Links users to a specific match.
-
-### 🍽️ Vendors & Social
-*   **`vendors`**: Information about restaurants and hangout spots.
-*   **`bookings`**: Tracks reservations made by matches.
-*   **`ledger`**: Handles wallet balances and internal transactions.
+LinqUp uses **Supabase** as its unified backend provider, leveraging PostgreSQL, Realtime, and Edge Functions to handle complex social logic entirely on the server side.
 
 ---
 
-## ⚡ Automations & Triggers (The "Secret Sauce")
+## 🏗️ Client Setup & Configuration
 
+### Initialization
+When creating the Supabase client, we enforce strict typing using the generated `Database` types (typically exported to `@/types/supabase.ts`).
+
+> [!IMPORTANT]
+> For security reasons, never include the full `Database` type file in your public documentation or commit it to unprotected public repositories.
+
+```typescript
+import { createClient } from '@supabase/supabase-js';
+import { Database } from '@/types/supabase';
+
+export const supabase = createClient<Database>(
+  process.env.EXPO_PUBLIC_SUPABASE_URL!,
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
+);
+```
+
+### Persistent Storage
+The app uses different storage engines depending on the platform:
+- **Mobile (React Native/Expo)**: Must use `AsyncStorage` from `@react-native-async-storage/async-storage`.
+- **Web (Next.js/React)**: Must use a web-compatible library (like `localStorage` or `cookie-storage`) as `AsyncStorage` is not available in standard browser environments.
+
+---
+
+## 🔐 Authentication & Roles
+
+### User Lifecycle
+1. **Login**: Standard email/password or OTP authentication.
+2. **Onboarding**: Users must complete their profile before accessing the main app.
+3. **Roles**: Managed via custom JWT claims synced from the database.
+
+### Administrative Workflows
+Administrators are managed via specialized Edge Functions to ensure high security and relational integrity.
+
+| Function | Requirement | Action |
+| :--- | :--- | :--- |
+| `add-admin` | **Super Admin** only | Creates Auth user, Public record, and sends invitation email via Resend. |
+| `deactivate-admin` | **Super Admin** only | Toggles the `is_deactivated` flag. Instantly updates JWT claims to block access. |
+
+---
+
+## 📁 File Storage (Supabase Storage)
+
+### Bucket Configuration
+We use multiple buckets to segregate content by sensitivity and usage.
+
+| Bucket | Access | Purpose |
+| :--- | :--- | :--- |
+| `profiles` | Public | User profile photos and gallery images. |
+| `restaurants` | Public | Restaurant cover photos and promotional images. |
+| `businesses` | Public | CAC documents and tax IDs (Read-only for Admins). |
+| `chat` | **Private** | Images sent in direct messages. Requires signed URLs. |
+| `system` | Private | Internal assets, CSV seeds, and setup files. |
+
+### Retrieving File URLs
+Depending on the bucket privacy, use one of these two methods located in `api/handleUpload.ts`:
+
+**1. Public URL (Fast / Shared)**
+Used for profile pictures where privacy is less critical.
+```typescript
+const { data } = supabase.storage.from('profiles').getPublicUrl(path);
+```
+
+**2. Signed URL (Secure / Private)**
+Used for the `chat` bucket. Generates a temporary link that expires.
+```typescript
+const { data, error } = await supabase.storage
+    .from('chat')
+    .createSignedUrl(path, 3600); // Valid for 1 hour
+```
+
+---
+
+## ⚡ Automations & Triggers
 We offload heavy lifting to the database using PL/pgSQL functions and triggers.
-
-### 1. ELO Rating System
-When a user reacts to a recommendation, the `on_recommendation_reaction` trigger fires:
-*   Updates the **ELO Rating** of the recommended profile based on the outcome (Like/Reject).
-*   Uses a dynamic **K-factor** (lower for veteran users) to stabilize ratings over time.
-
-### 2. Match Generation
-The same trigger checks for a **Mutual Like**. If User B has already liked User A, a new record is automatically inserted into `matches` and `match_participants`.
-
-### 3. Daily Recommendation Engine
-*   **`generate_recommendations`**: A complex query that finds profiles matching a user's preferences, excluding already reacting users and blocked profiles.
-*   **`run_nightly_recommendations`**: A wrapper that refreshes the queue for all active users.
-*   **Cron Job**: Scheduled via `pg_cron` to run nightly at 2 AM UTC:
-    ```sql
-    select cron.schedule('nightly-recommendations', '0 2 * * *', 'select run_nightly_recommendations()');
-    ```
-
----
-
-## 🔒 Security (RLS)
-
-Every table has RLS enabled. Policy patterns include:
-*   **Profiles**: Public read for specific fields (name, photos), private write (`auth.uid() = id`).
-*   **Matching**: Users can only see/update recommendations where `recommended_to = auth.uid()`.
-*   **Matches**: Access granted only if `auth.uid()` is a participant in that match.
-
----
-
-## 🚀 Edge Functions
-
-Custom logic that requires external APIs or specialized processing is handled by Supabase Edge Functions:
-*   **Payment Processing**: Integrating with Monnify for wallet funding.
-*   **Image Processing**: Handling face verification and image optimization.
-*   **Real-time Notifications**: Triggering push notifications via Expo SDK.
+- **ELO Rating System**: Updates dynamically after every swipe interaction.
+- **Match Generation**: Automatically detects mutual likes and creates match records.
+- **JWT Claims Sync**: Ensures the frontend always knows the user's `type` (admin/user/vendor) without extra API calls.
