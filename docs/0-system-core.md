@@ -270,7 +270,15 @@ Entity images are stored in dedicated buckets based on their type.
 | `chats`      | Message attachments        | **Private** (Signed URLs only) |
 | `apps`       | Platform assets            | **Public**                     |
 
-### 2. One-Shot Image Processing
+### 2. Storage Security (RLS)
+Access to storage folders is strictly controlled via PostgreSQL RLS policies that leverage custom JWT claims.
+
+- **`stores`**: Restricted to **Admins** and **Vendors** belonging to the business that owns the store. 
+- **User-Specific Buckets** (`profiles`, `admins`, `vendors`): Users can only manage files within a folder named after their `auth.uid`.
+- **`businesses`**: Restricted to **Admins** and team members belonging to that specific `business_id`.
+- **`chats`**: Private; users can only manage files within their own `auth.uid` folder.
+
+### 3. One-Shot Image Processing
 
 To provide a premium experience and optimize storage, LinqUp uses a unified "One-Shot" Edge Function for all image uploads.
 
