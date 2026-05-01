@@ -277,37 +277,82 @@ To provide a premium loading experience, all images must have a **Blurhash** gen
 - **Cross-Platform:** For **Next.js/Web**, do not use client-side libraries. Instead, call the `generate-blurhash-bulk` Edge Function from your server to maintain consistency with the mobile app.
 
 ### 3. Implementation: `api/handleUpload.ts`
+Full implementation for file management, signature generation, and cloud-based image processing.
+
 ```typescript
 import { supabase } from "../lib/supabase";
 
-// 1. Upload with Automatic Blurhash
-const uploadWithBlurhash = async ({ id, uri, bucketName }) => {
+// 1. Simple Single File Upload
+const uploadFile = async ({ id, uri, mimeType, bucketName }) => {
+  const arraybuffer = await fetch(uri).then((res) => res.arrayBuffer());
+  const fileExt = uri.split(".").pop();
+  const path = `${id}/${Date.now()}.${fileExt}`;
+  
+  const { data, error } = await supabase.storage
+    .from(bucketName)
+    .upload(path, arraybuffer, { contentType: mimeType });
+    
+  if (error) throw error;
+  return { uri: data.path, isSuccessful: true };
+};
+
+// 2. Upload with Automatic Server-Side Blurhash (Recommended)
+// This calls a Deno Edge function to generate blurhash and upload in one step
+const uploadWithBlurhash = async ({ id, uri, bucketName, fileName }) => {
   const arraybuffer = await fetch(uri).then((res) => res.arrayBuffer());
   const { data, error } = await supabase.functions.invoke("upload-with-blurhash", {
     body: arraybuffer,
     headers: {
       "x-bucket-name": bucketName,
       "x-user-id": id,
+      "x-file-name": fileName || "image",
       "content-type": "image/webp",
     },
   });
-  return data; // { uri, blur_hash, width, height }
+  if (error) throw error;
+  return data; // Returns { uri, blur_hash, width, height }
 };
 
-// 2. Fetching Public URLs
-const getPublicUrl = (bucket: string, path: string) => {
-  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-  return data.publicUrl;
+// 3. Bulk Blurhash Generation (For existing images or Next.js server-side)
+const generateBlurhashesBulk = async (base64Images: string[]) => {
+  const { data, error } = await supabase.functions.invoke("generate-blurhash-bulk", {
+    body: { images: base64Images },
+  });
+  if (error) throw error;
+  return data; // Array of blurhash strings
 };
 
-// 3. Downloading Private Files (Chats)
+// 4. File Deletion
+const deleteFile = async ({ bucketName, uri }) => {
+  const { error } = await supabase.storage.from(bucketName).remove([uri]);
+  if (error) throw error;
+  return { isSuccessful: true };
+};
+
+// 5. Secure Download (For 'chats' bucket)
 const downloadFile = async ({ bucketName, uri }) => {
   const { data, error } = await supabase.storage
     .from(bucketName)
-    .createSignedUrl(uri, 86400); // 24h validity
+    .createSignedUrl(uri, 86400);
+  if (error) throw error;
   return data?.signedUrl;
 };
 ```
+
+### 4. Constructing Image URLs
+Storing only the `path` in the database is the standard. Use these patterns to resolve the full URL for display:
+
+#### Public Buckets (Profiles, Stores, etc.)
+Construct the URL directly using the project storage base:
+```typescript
+const getPublicUrl = (bucket: string, path: string) => {
+  const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
+  return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`;
+};
+```
+
+#### Private Buckets (Chats)
+You **must** use a signed URL via `downloadFile`. These URLs are temporary and should not be stored in the database.
 
 ---
 
