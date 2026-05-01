@@ -53,6 +53,9 @@ For web deployments, use **standard browser storage** or a **cookie-based approa
 
 ---
 
+> [!IMPORTANT]
+> **Serverless Architecture:** LinqUp uses a **Serverless / SDK-First** approach. While endpoints are listed using REST conventions (e.g., `GET /resource`) for clarity, developers should **NOT** use Axios or Fetch. Always use the provided **Supabase SDK** utilities documented in each section to ensure proper type safety and RLS authentication.
+
 ## 🚀 Roadmap Phase 0
 
 ### 0. Infrastructure
