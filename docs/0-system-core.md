@@ -269,12 +269,22 @@ Entity images are stored in dedicated buckets based on their type.
 | `users` | General user uploads | **Public** |
 | `apps` | Platform assets | **Public** |
 
-### 2. Image Processing (Blurhash)
-To provide a premium loading experience, all images must have a **Blurhash** generated before or during upload.
+### 2. One-Shot Image Processing
+To provide a premium experience and optimize storage, LinqUp uses a unified "One-Shot" Edge Function for all image uploads.
 
-- **Mechanism:** Images are sent to the `upload-with-blurhash` Edge Function.
-- **Storage:** The function returns the `uri`, `blur_hash`, `width`, and `height`. These should be saved in the database alongside the image path.
-- **Cross-Platform:** For **Next.js/Web**, do not use client-side libraries. Instead, call the `generate-blurhash-bulk` Edge Function from your server to maintain consistency with the mobile app.
+#### Workflow:
+1.  **Input:** Client sends raw image data to `upload-with-blurhash`.
+2.  **WebP Conversion:** The server automatically converts the image to **WebP (85% quality)**.
+3.  **Intelligent Resizing:** If the image width exceeds **1024px**, it is scaled down to 1024px while maintaining aspect ratio.
+4.  **Blurhash Generation:** The function creates a 32x32 thumbnail in-memory to generate a Blurhash sequence.
+5.  **Direct Upload:** The finalized WebP is uploaded to the designated bucket at `[entity_id]/[filename]-[timestamp].webp`.
+6.  **Response:** The client receives:
+    *   `uri`: The storage path (e.g., `user_123/banner-17145700.webp`).
+    *   `blur_hash`: The hash string for the `BlurView`.
+    *   `width`/`height`: The original dimensions of the image.
+
+#### Cross-Platform Strategy:
+- **Mobile & Web:** Both platforms should use the same `api/handleUpload.ts` utilities. This ensures that every image in the system follows the exact same compression and placeholder standards without needing specific libraries in the Web or Mobile app repos.
 
 ### 3. Implementation: `api/handleUpload.ts`
 Full implementation for file management, signature generation, and cloud-based image processing.
