@@ -273,7 +273,8 @@ Entity images are stored in dedicated buckets based on their type.
 To provide a premium experience and optimize storage, LinqUp uses a unified "One-Shot" Edge Function for all image uploads.
 
 #### Workflow:
-1.  **Input:** Client sends raw image data to `upload-with-blurhash`.
+1.  **Input:** Client sends raw image data and an **Entity ID** to `upload-with-blurhash`.
+    *   *Note: The `id` should be the UUID of the entity (user, store, etc.). If creating a new entity, generate a local UUID using the `uuidv4` library before uploading.*
 2.  **WebP Conversion:** The server automatically converts the image to **WebP (85% quality)**.
 3.  **Intelligent Resizing:** If the image width exceeds **1024px**, it is scaled down to 1024px while maintaining aspect ratio.
 4.  **Blurhash Generation:** The function creates a 32x32 thumbnail in-memory to generate a Blurhash sequence.
