@@ -18,6 +18,13 @@ const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+
+// 3. (Optional but Recommended) Export table-specific types for convenience
+export type Tables<T extends keyof Database["public"]["Tables"]> =
+    Database["public"]["Tables"][T]["Row"];
+export type Enums<T extends keyof Database["public"]["Enums"]> =
+    Database["public"]["Enums"][T];
+
 ```
 
 ### 2. API Response Structure
