@@ -372,7 +372,7 @@ const downloadFile = async ({ bucketName, uri }) => {
 
 ### 4. Fetching Image URLs
 
-Storing only the `path` in the database is the standard. Use this conditional pattern (as seen in the `Avatar` component) to resolve the full URL for display:
+Storing only the `path` in the database is the standard. Use this conditional pattern to resolve the full URL for display:
 
 ```typescript
 const resolveImageUrl = async (bucketName: BucketName, uri: string) => {
