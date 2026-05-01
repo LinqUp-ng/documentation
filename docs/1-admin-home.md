@@ -11,6 +11,10 @@
     - **Admins:** See all transactions across the platform.
     - **Vendors:** See transactions for their store wallet (store_id required).
     - **Users:** See transactions for their personal wallet.
+- [x] **Upcoming LinqUps:** `GET /linq-ups` - Fetches cursor-paginated upcoming linq_ups. The system automatically filters results based on the caller's context:
+    - **Admins:** See all upcoming linq_ups across the platform (store_id optional).
+    - **Vendors:** See upcoming linq_ups for their store only (store_id required).
+    - **Users:** Not authorized to access linq_ups.
 - [ ] **KYC & Moderation:** `GET /admin/kyc`, `POST /admin/kyc/:id/review`, `GET /admin/reports`.
 - [ ] **Team:** `GET /admin/team`, `POST /admin/team` (Add with system-generated password).
 
@@ -144,7 +148,7 @@ const getRecentTransactions = async (
       cursor_timestamp 
     } = params;
 
-    const { data, error } = await (supabase.rpc as any)('get_recent_transactions', {
+    const { data, error } = await supabase.rpc('get_recent_transactions', {
       p_limit: limit,
       ...(store_id && { p_store_id: store_id }),
       ...(cursor_id && { p_cursor_id: cursor_id }),
@@ -165,6 +169,68 @@ const getRecentTransactions = async (
 
 export default {
   getRecentTransactions,
+};
+```
+
+#### Implementation: `api/handleUpcomingLinqUps.ts`
+
+```typescript
+import { supabase } from "@/lib/supabase";
+import { Response } from "@/types/api";
+import { Database } from "@/types/database.types";
+
+export interface GetUpcomingLinqUpsParams {
+  limit?: number;
+  store_id?: string;
+  cursor_id?: string;
+  cursor_timestamp?: string;
+}
+
+// Use the composite type from database
+export type LinqUpResponse = Database["public"]["CompositeTypes"]["linq_up_response"];
+
+/**
+ * Fetch upcoming linq_ups with cursor-based pagination.
+ * The system automatically filters results based on the caller's context:
+ * - Admins: See all upcoming linq_ups across the platform (store_id optional)
+ * - Vendors: See upcoming linq_ups for their store only (store_id required)
+ * - Users: Not authorized to access linq_ups
+ * 
+ * Only returns linq_ups scheduled for the future (date_scheduled >= NOW()).
+ * Results are ordered by date_scheduled ascending (earliest upcoming first).
+ */
+const getUpcomingLinqUps = async (
+  params: GetUpcomingLinqUpsParams = {}
+): Promise<Response<LinqUpResponse[]>> => {
+  try {
+    const { 
+      limit = 10, 
+      store_id, 
+      cursor_id, 
+      cursor_timestamp 
+    } = params;
+
+    const { data, error } = await supabase.rpc('get_upcoming_linq_ups', {
+      p_limit: limit,
+      ...(store_id && { p_store_id: store_id }),
+      ...(cursor_id && { p_cursor_id: cursor_id }),
+      ...(cursor_timestamp && { p_cursor_timestamp: cursor_timestamp }),
+    });
+
+    if (error) throw error;
+
+    return {
+      isSuccessful: true,
+      message: "Upcoming linq_ups fetched successfully",
+      data: (data as LinqUpResponse[]) || []
+    };
+  } catch (error) {
+    throw error;
+  }
+};
+
+export default {
+  getUpcomingLinqUps,
 };
 ```
 
@@ -207,7 +273,7 @@ const getPlatformAnalytics = async (
       end_date 
     } = params;
 
-    const { data, error } = await (supabase.rpc as any)('get_platform_analytics', {
+    const { data, error } = await supabase.rpc('get_platform_analytics', {
       p_start_date: start_date,
       p_end_date: end_date,
     });
@@ -237,7 +303,7 @@ const getPlatformLedgerDebug = async (
       end_date 
     } = params;
 
-    const { data, error } = await (supabase.rpc as any)('get_platform_ledger_debug', {
+    const { data, error } = await supabase.rpc('get_platform_ledger_debug', {
       p_start_date: start_date,
       p_end_date: end_date,
     });
