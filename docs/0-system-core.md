@@ -274,7 +274,8 @@ Entity images are stored in dedicated buckets based on their type.
 Access to storage folders is strictly controlled via PostgreSQL RLS policies that leverage custom JWT claims.
 
 - **`stores`**: Restricted to **Admins** and **Vendors** belonging to the business that owns the store. 
-- **User-Specific Buckets** (`profiles`, `admins`, `vendors`): Users can only manage files within a folder named after their `auth.uid`.
+- **`profiles`**: Open to **all authenticated users** to support onboarding flows where the folder ID is generated locally.
+- **`admins`, `vendors`**: Users can only manage files within a folder named after their `auth.uid`.
 - **`businesses`**: Restricted to **Admins** and team members belonging to that specific `business_id`.
 - **`chats`**: Private; users can only manage files within their own `auth.uid` folder.
 
