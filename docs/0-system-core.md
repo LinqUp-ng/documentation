@@ -253,41 +253,46 @@ const requestPasswordReset = async (email: string) => {
 ---
 
 ## 🛠️ Utilities & File Management
+
 LinqUp uses a centralized storage and image processing system to ensure fast loading and consistent media handling across platforms.
 
 ### 1. Storage Buckets & Privacy
+
 Entity images are stored in dedicated buckets based on their type.
 
-| Bucket | Entity | Access Control |
-| :--- | :--- | :--- |
-| `profiles` | User Avatars | **Public** |
-| `stores` | Store images/banners | **Public** |
-| `admins` | Admin profile media | **Public** |
-| `vendors` | Vendor documentation/media | **Public** |
-| `businesses` | Business logos/assets | **Public** |
-| `chats` | Message attachments | **Private** (Signed URLs only) |
-| `users` | General user uploads | **Public** |
-| `apps` | Platform assets | **Public** |
+| Bucket       | Entity                     | Access Control                 |
+| :----------- | :------------------------- | :----------------------------- |
+| `profiles`   | User Avatars               | **Public**                     |
+| `stores`     | Store images/banners       | **Public**                     |
+| `admins`     | Admin profile media        | **Public**                     |
+| `vendors`    | Vendor documentation/media | **Public**                     |
+| `businesses` | Business logos/assets      | **Public**                     |
+| `chats`      | Message attachments        | **Private** (Signed URLs only) |
+| `apps`       | Platform assets            | **Public**                     |
 
 ### 2. One-Shot Image Processing
+
 To provide a premium experience and optimize storage, LinqUp uses a unified "One-Shot" Edge Function for all image uploads.
 
 #### Workflow:
+
 1.  **Input:** Client sends raw image data and an **Entity ID** to `upload-with-blurhash`.
-    *   *Note: The `id` should be the UUID of the entity (user, store, etc.). If creating a new entity, generate a local UUID using the `uuidv4` library before uploading.*
+    - _Note: The `id` should be the UUID of the entity (user, store, etc.). If creating a new entity, generate a local UUID using the `uuidv4` library before uploading._
 2.  **WebP Conversion:** The server automatically converts the image to **WebP (85% quality)**.
 3.  **Intelligent Resizing:** If the image width exceeds **1024px**, it is scaled down to 1024px while maintaining aspect ratio.
 4.  **Blurhash Generation:** The function creates a 32x32 thumbnail in-memory to generate a Blurhash sequence.
 5.  **Direct Upload:** The finalized WebP is uploaded to the designated bucket at `[entity_id]/[filename]-[timestamp].webp`.
 6.  **Response:** The client receives:
-    *   `uri`: The storage path (e.g., `user_123/banner-17145700.webp`).
-    *   `blur_hash`: The hash string for the `BlurView`.
-    *   `width`/`height`: The original dimensions of the image.
+    - `uri`: The storage path (e.g., `user_123/banner-17145700.webp`).
+    - `blur_hash`: The hash string for the `BlurView`.
+    - `width`/`height`: The original dimensions of the image.
 
 #### Cross-Platform Strategy:
+
 - **Mobile & Web:** Both platforms should use the same `api/handleUpload.ts` utilities. This ensures that every image in the system follows the exact same compression and placeholder standards without needing specific libraries in the Web or Mobile app repos.
 
 ### 3. Implementation: `api/handleUpload.ts`
+
 Full implementation for file management, signature generation, and cloud-based image processing.
 
 ```typescript
@@ -298,11 +303,11 @@ const uploadFile = async ({ id, uri, mimeType, bucketName }) => {
   const arraybuffer = await fetch(uri).then((res) => res.arrayBuffer());
   const fileExt = uri.split(".").pop();
   const path = `${id}/${Date.now()}.${fileExt}`;
-  
+
   const { data, error } = await supabase.storage
     .from(bucketName)
     .upload(path, arraybuffer, { contentType: mimeType });
-    
+
   if (error) throw error;
   return { uri: data.path, isSuccessful: true };
 };
@@ -311,24 +316,30 @@ const uploadFile = async ({ id, uri, mimeType, bucketName }) => {
 // This calls a Deno Edge function to generate blurhash and upload in one step
 const uploadWithBlurhash = async ({ id, uri, bucketName, fileName }) => {
   const arraybuffer = await fetch(uri).then((res) => res.arrayBuffer());
-  const { data, error } = await supabase.functions.invoke("upload-with-blurhash", {
-    body: arraybuffer,
-    headers: {
-      "x-bucket-name": bucketName,
-      "x-user-id": id,
-      "x-file-name": fileName || "image",
-      "content-type": "image/webp",
+  const { data, error } = await supabase.functions.invoke(
+    "upload-with-blurhash",
+    {
+      body: arraybuffer,
+      headers: {
+        "x-bucket-name": bucketName,
+        "x-user-id": id,
+        "x-file-name": fileName || "image",
+        "content-type": "image/webp",
+      },
     },
-  });
+  );
   if (error) throw error;
   return data; // Returns { uri, blur_hash, width, height }
 };
 
 // 3. Bulk Blurhash Generation (For existing images or Next.js server-side)
 const generateBlurhashesBulk = async (base64Images: string[]) => {
-  const { data, error } = await supabase.functions.invoke("generate-blurhash-bulk", {
-    body: { images: base64Images },
-  });
+  const { data, error } = await supabase.functions.invoke(
+    "generate-blurhash-bulk",
+    {
+      body: { images: base64Images },
+    },
+  );
   if (error) throw error;
   return data; // Array of blurhash strings
 };
@@ -351,6 +362,7 @@ const downloadFile = async ({ bucketName, uri }) => {
 ```
 
 ### 4. Fetching Image URLs
+
 Storing only the `path` in the database is the standard. Use this conditional pattern (as seen in the `Avatar` component) to resolve the full URL for display:
 
 ```typescript
