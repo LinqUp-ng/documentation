@@ -339,20 +339,27 @@ const downloadFile = async ({ bucketName, uri }) => {
 };
 ```
 
-### 4. Constructing Image URLs
-Storing only the `path` in the database is the standard. Use these patterns to resolve the full URL for display:
+### 4. Fetching Image URLs
+Storing only the `path` in the database is the standard. Use this conditional pattern (as seen in the `Avatar` component) to resolve the full URL for display:
 
-#### Public Buckets (Profiles, Stores, etc.)
-Construct the URL directly using the project storage base:
 ```typescript
-const getPublicUrl = (bucket: string, path: string) => {
-  const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
-  return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`;
+const resolveImageUrl = async (bucketName: BucketName, uri: string) => {
+  if (bucketName === BucketName.CHATS) {
+    // Private: Requires a signed URL or base64 download
+    return await handleUpload.downloadFile({
+      uri,
+      bucketName,
+      base64: false, // Set to true if raw data is needed
+    });
+  } else {
+    // Public: Generate direct public link instantly
+    return supabase.storage.from(bucketName).getPublicUrl(uri).data.publicUrl;
+  }
 };
 ```
 
-#### Private Buckets (Chats)
-You **must** use a signed URL via `downloadFile`. These URLs are temporary and should not be stored in the database.
+> [!TIP]
+> Public URLs are deterministic and generated client-side without a database call, making them extremely fast for lists and feeds.
 
 ---
 
