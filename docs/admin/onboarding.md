@@ -1,4 +1,4 @@
-# Administrative Management
+# Onboarding
 
 Administrative accounts are controlled via specialized Edge Functions to maintain strict relational integrity and enforce high-level security permissions.
 
@@ -183,6 +183,8 @@ const result = await handleAdmin.getOnboardingAdmin("abc123token");
 ### 3. completeAdminSignup
 
 Completes admin signup by setting a password and activating the account via the `complete-admin-signup` edge function.
+
+**Note:** After successfully completing signup, the user should call the standard login endpoint to establish their session. See `api/handleAuth.ts` for the login implementation.
 
 ```typescript
 const completeAdminSignup = async (

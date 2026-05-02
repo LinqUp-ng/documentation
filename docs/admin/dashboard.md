@@ -1,4 +1,4 @@
-# Admin Home Screen
+# Dashboard
 *Setting up the ecosystem and internal team controls.*
 
 ### 1. Admin Operations
