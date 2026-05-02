@@ -29,6 +29,9 @@ import { CompositeTypes, Database } from "@/types/database.types";
 export type ActivityType = Database['public']['Enums']['activity_type'];
 export type UserType = Database['public']['Enums']['user_type'];
 
+// Use composite type from database
+export type Activity = CompositeTypes<'activity_item_response'>;
+
 export interface GetActivitiesParams {
   limit?: number;
   store_id?: string;
@@ -89,6 +92,7 @@ export default {
 ```typescript
 import { supabase } from "@/lib/supabase";
 import { Response } from "@/types/api";
+import { Database } from "@/types/database.types";
 
 export interface GetRecentTransactionsParams {
   limit?: number;
@@ -97,38 +101,8 @@ export interface GetRecentTransactionsParams {
   cursor_timestamp?: string;
 }
 
-export interface TransactionItemResponse {
-  id: number;
-  wallet_id: string;
-  entry_type: 'credit' | 'debit';
-  amount: number;
-  balance_after: number;
-  reference: string;
-  description: string | null;
-  transaction_id: string | null;
-  created_at: string;
-  wallet: {
-    id: string;
-    owner_type: 'user' | 'business' | 'store' | 'platform';
-    balance: number;
-    is_active: boolean;
-  } | null;
-  profile: {
-    id: string;
-    name: string;
-    profile_photo: string | null;
-  } | null;
-  business: {
-    id: string;
-    business_name: string;
-  } | null;
-  store: {
-    id: string;
-    store_name: string;
-    cover_photo: string | null;
-    cover_photo_blur_hash: string | null;
-  } | null;
-}
+// Use composite type from database
+export type TransactionItemResponse = Database["public"]["CompositeTypes"]["transaction_item_response"];
 
 /**
  * Fetch recent transactions with cursor-based pagination.
@@ -177,7 +151,7 @@ export default {
 ```typescript
 import { supabase } from "@/lib/supabase";
 import { Response } from "@/types/api";
-import { Database } from "@/types/database.types";
+import { CompositeTypes } from "@/types/database.types";
 
 export interface GetUpcomingLinqUpsParams {
   limit?: number;
@@ -187,7 +161,7 @@ export interface GetUpcomingLinqUpsParams {
 }
 
 // Use the composite type from database
-export type LinqUpResponse = Database["public"]["CompositeTypes"]["linq_up_response"];
+export type LinqUpResponse = CompositeTypes<'linq_up_response'>;
 
 /**
  * Fetch upcoming linq_ups with cursor-based pagination.
@@ -239,25 +213,15 @@ export default {
 ```typescript
 import { supabase } from "@/lib/supabase";
 import { Response } from "@/types/api";
+import { CompositeTypes } from "@/types/database.types";
 
 export interface GetPlatformAnalyticsParams {
   start_date?: string;
   end_date?: string;
 }
 
-export interface PlatformAnalyticsResponse {
-  start_date: string;
-  end_date: string;
-  transactions: {
-    label: string;
-    value: number;
-  }[];
-  subscriptions: {
-    label: string;
-    value: number;
-  }[];
-  percentage_difference: number | null;
-}
+// Use composite type from database
+export type PlatformAnalyticsResponse = CompositeTypes<'platform_analytics_response'>;
 
 /**
  * Fetch platform analytics for admin dashboard.
