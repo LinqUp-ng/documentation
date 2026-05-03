@@ -97,3 +97,115 @@ console.log(result.data.onboardingToken); // Share this with the vendor for onbo
 - The vendor will use this token to retrieve their onboarding details and complete signup
 - Store logo and cover photo should be uploaded first using the upload API
 - Working hours are optional but recommended for proper store operations
+
+## Get All Businesses
+
+Retrieves a paginated list of all businesses. This operation requires admin authentication.
+
+### Usage Example
+
+```typescript
+import { handleVendors } from '@/api/handleVendors';
+import { Database } from '@/types/database.types';
+
+// Get first page of businesses
+const result = await handleVendors.getAllBusinesses({
+    limit: 10
+});
+
+if (result.isSuccessful) {
+    const businesses = result.data; // Database["public"]["CompositeTypes"]["business_item_response"][]
+    businesses.forEach(business => {
+        console.log(business.business_name);
+        console.log(business.number_of_stores);
+        console.log(business.status);
+    });
+}
+
+// Get next page using cursor
+const lastBusiness = businesses[businesses.length - 1];
+const nextPage = await handleVendors.getAllBusinesses({
+    limit: 10,
+    cursorBusinessName: lastBusiness.business_name,
+    cursorId: lastBusiness.id
+});
+```
+
+### Response Type
+
+```typescript
+{
+    data: Database["public"]["CompositeTypes"]["business_item_response"][];
+    isSuccessful: boolean;
+    message: string;
+}
+```
+
+### Business Item Response
+
+```typescript
+{
+    id: string;
+    business_name: string;
+    logo: Database["public"]["CompositeTypes"]["image_type"] | null;
+    number_of_stores: number;
+    created_at: string;
+    updated_at: string;
+    status: "active" | "suspended" | "pending_activation";
+}
+```
+
+### Cursor Pagination
+
+- Results are sorted by `business_name` then `id` in ascending order
+- To paginate, pass the `business_name` and `id` of the last item from the previous page as `cursorBusinessName` and `cursorId`
+- The `limit` parameter controls the number of results per page (default: 10)
+
+## Get Business Summary
+
+Retrieves summary statistics for all businesses. This operation requires admin authentication.
+
+### Usage Example
+
+```typescript
+import { handleVendors } from '@/api/handleVendors';
+import { CompositeTypes } from '@/types/database.types';
+
+const result = await handleVendors.getAllBusinessSummary();
+
+if (result.isSuccessful) {
+    const summary = result.data; // CompositeTypes<'business_summary_response'>
+    console.log('Total businesses:', summary.all_business_count);
+    console.log('Active businesses:', summary.active_business_count);
+    console.log('Suspended businesses:', summary.suspended_business_count);
+    console.log('Pending activation:', summary.pending_activation_business_count);
+}
+```
+
+### Response Type
+
+```typescript
+{
+    data: CompositeTypes<'business_summary_response'> | null;
+    isSuccessful: boolean;
+    message: string;
+}
+```
+
+### Business Summary Response
+
+```typescript
+{
+    all_business_count: number;
+    active_business_count: number;
+    suspended_business_count: number;
+    pending_activation_business_count: number;
+}
+```
+
+### Notes for Admin Functions
+
+- Both `getAllBusinesses` and `getAllBusinessSummary` require admin authentication
+- These functions use `security definer` and perform admin-only checks internally
+- They return type-safe responses using CompositeTypes from database.types.ts
+- Handle errors gracefully by checking `isSuccessful` before accessing data
