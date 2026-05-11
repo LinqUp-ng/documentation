@@ -2,6 +2,12 @@
 
 This document covers vendor-related operations for administrators.
 
+## API Implementation
+
+```typescript
+@/Users/ovieokomite-iffie/Documents/mobile apps/linqUp/api/handleVendors.ts:1-257
+```
+
 ## Add Business
 
 Creates a new business with store and owner vendor. This operation requires super_admin authentication.
