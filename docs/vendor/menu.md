@@ -353,6 +353,33 @@ const insertSubMenu = async (
 };
 
 /**
+ * Insert multiple sub menus in one shot
+ * @param subMenuDataArray - Array of sub menu data to insert
+ * @returns The inserted sub menus or error
+ */
+const insertSubMenus = async (
+  subMenuDataArray: SubMenuInsert[]
+): Promise<Response<SubMenu[]>> => {
+  try {
+    const { data, error } = await supabase
+      .from('sub_menus')
+      .insert(subMenuDataArray)
+      .select();
+
+    if (error) throw error;
+
+    return {
+      isSuccessful: true,
+      message: 'Sub menus inserted successfully',
+      data: data || [],
+    };
+  } catch (error) {
+    console.error('Error inserting sub menus:', error);
+    throw error;
+  }
+};
+
+/**
  * Update an existing sub menu
  * @param subMenuId - The ID of the sub menu to update
  * @param subMenuData - The sub menu data to update
@@ -483,6 +510,7 @@ export default {
     updateMenuGroup,
     deleteMenuGroup,
     insertSubMenu,
+    insertSubMenus,
     updateSubMenu,
     deleteSubMenu,
     getMenuByStoreID,
@@ -494,6 +522,8 @@ export default {
 
 ### `insertMenu`
 Inserts a new menu item into the database.
+
+**Important:** The `type` parameter must be a valid entry from the `menu_types` table. You should first retrieve all menu types using `getAllMenuTypes()` and use the `name` field from the desired menu type as the `type` parameter.
 
 ```typescript
 const insertMenu = async (
@@ -819,6 +849,33 @@ const insertSubMenu = async (
 };
 ```
 
+### `insertSubMenus`
+Inserts multiple sub-menu items (options) to a group in a single batch operation.
+
+```typescript
+const insertSubMenus = async (
+  subMenuDataArray: SubMenuInsert[]
+): Promise<Response<SubMenu[]>> => {
+  try {
+    const { data, error } = await supabase
+      .from('sub_menus')
+      .insert(subMenuDataArray)
+      .select();
+
+    if (error) throw error;
+
+    return {
+      isSuccessful: true,
+      message: 'Sub menus inserted successfully',
+      data: data || [],
+    };
+  } catch (error) {
+    console.error('Error inserting sub menus:', error);
+    throw error;
+  }
+};
+```
+
 ### `updateSubMenu`
 Updates an existing sub-menu item.
 
@@ -963,9 +1020,25 @@ if (uploadResult.isSuccessful) {
 ### Step 2: Add Menu Item
 Pass the `uri` and `blur_hash` from Step 1 into the `insertMenu` function.
 
+**Important:** The `type` parameter must be a valid entry from the `menu_types` table. First retrieve all menu types, then use the `name` field from the desired menu type.
+
 ```typescript
 import menuApi from '@/api/handleMenu';
 
+// Step 2a: Get available menu types
+const menuTypesResult = await menuApi.getAllMenuTypes();
+
+if (!menuTypesResult.isSuccessful) {
+  throw new Error('Failed to retrieve menu types');
+}
+
+// Step 2b: Select the desired menu type by name
+const menuType = menuTypesResult.data.find(mt => mt.name === 'Main');
+if (!menuType) {
+  throw new Error('Menu type not found');
+}
+
+// Step 2c: Insert menu item with the selected type
 const menuResult = await menuApi.insertMenu({
   name: "Signature Burger",
   description: "Our world-famous beef burger",
@@ -973,7 +1046,7 @@ const menuResult = await menuApi.insertMenu({
   image_uri: uploadResult.uri, // From Step 1
   image_blur_hash: uploadResult.blur_hash, // From Step 1
   store_id: storeId,
-  type: 'main'
+  type: menuType.name // Use the name from the menu_types table
 });
 ```
 
@@ -1029,6 +1102,8 @@ if (groupResult.isSuccessful) {
 #### Step 2: Add Sub-Menus to the Group
 Sub-menus are the individual options within a group (e.g., "Small", "Medium", "Large").
 
+**Option A: Insert one at a time**
+
 ```typescript
 import menuApi from '@/api/handleMenu';
 
@@ -1050,6 +1125,35 @@ const subMenu3 = await menuApi.insertSubMenu({
   name: "Large",
   price: 4000, // Additional 4000 currency units
 });
+```
+
+**Option B: Insert multiple in one shot (recommended for bulk operations)**
+
+```typescript
+import menuApi from '@/api/handleMenu';
+
+// Add multiple sub-menu options in a single batch operation
+const subMenus = await menuApi.insertSubMenus([
+  {
+    menu_group_id: groupId,
+    name: "Small",
+    price: 5000,
+  },
+  {
+    menu_group_id: groupId,
+    name: "Medium",
+    price: 2000,
+  },
+  {
+    menu_group_id: groupId,
+    name: "Large",
+    price: 4000,
+  }
+]);
+
+if (subMenus.isSuccessful) {
+  console.log('Inserted sub-menus:', subMenus.data);
+}
 ```
 
 #### Complete Example: Adding Multiple Groups with Options
