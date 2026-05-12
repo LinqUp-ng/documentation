@@ -48,18 +48,227 @@ The roles API provides functions to retrieve role definitions and user counts fo
 ```typescript
 import { supabase } from "@/lib/supabase";
 import { Response } from "@/types/api";
-import { CompositeTypes } from "@/types/database.types";
 
-export interface Role {
-    id: string;
-    role_type: "super_admin" | "owner" | "manager" | "accountant" | "member";
-    user_type: "user" | "vendor" | "admin";
-    readable_role_name: string;
-    description: string;
-    permissions: string[];
-    created_at: string;
-    updated_at: string;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "";
+const appClientSecret = process.env.EXPO_PUBLIC_APP_CLIENT_SECRET || "";
+
+export interface AddAdminParams {
+    first_name: string;
+    last_name: string;
+    email: string;
+    role: "super_admin" | "manager" | "accountant" | "member";
+    phone_number?: string;
+    profile_photo?: any;
+    profile_photo_hash?: string;
 }
+
+export interface OnboardingAdminData {
+    email: string;
+    role: string;
+    first_name: string | null;
+    last_name: string | null;
+    created_at: string;
+}
+
+export interface CompleteAdminSignupParams {
+    token: string;
+    password: string;
+}
+
+export interface CompleteAdminSignupResponse {
+    success: boolean;
+    message: string;
+    userId: string;
+    session?: any;
+    user?: any;
+}
+
+export interface EditAdminParams {
+    id: string;
+    first_name?: string;
+    last_name?: string;
+    phone_number?: string;
+    profile_photo?: any;
+    profile_photo_hash?: string;
+    role?: "super_admin" | "manager" | "accountant" | "member";
+}
+
+export interface DeactivateAdminParams {
+    id: string;
+    is_deactivated: boolean;
+}
+
+export interface ResendAdminInviteParams {
+    email: string;
+    is_development?: boolean;
+}
+
+/**
+ * Add a new administrator via edge function
+ */
+const addAdmin = async (params: AddAdminParams): Promise<Response<any>> => {
+    try {
+        const { data, error } = await supabase.functions.invoke("add-admin", {
+            body: params,
+        });
+
+        if (error) throw error;
+
+        return { data, isSuccessful: true, message: "Admin added successfully" };
+    } catch (error) {
+        return {
+            data: null,
+            isSuccessful: false,
+            message: error instanceof Error ? error.message : "Failed to add administrator",
+        };
+    }
+};
+
+/**
+ * Get onboarding admin details via edge function
+ * Public function - no auth required
+ */
+const getOnboardingAdmin = async (token: string): Promise<Response<OnboardingAdminData>> => {
+    try {
+        const { data, error } = await supabase.functions.invoke("get-onboarding-admin", {
+            body: { token },
+            headers: {
+                Authorization: `Bearer ${supabaseAnonKey}`,
+                "x-app-client-secret": appClientSecret,
+            },
+        });
+
+        console.log("Supabase response:", { data, error });
+
+        if (error) throw error;
+
+        // Check if response contains an error message
+        if (data && typeof data === 'object' && 'error' in data) {
+            throw new Error(data.error);
+        }
+
+        return { data, isSuccessful: true, message: "Fetched onboarding data" };
+    } catch (error) {
+        console.log("Caught error:", error);
+        let errorMessage = "Failed to fetch onboarding data";
+        if (error instanceof Error) {
+            errorMessage = error.message;
+        } else if (typeof error === 'string') {
+            errorMessage = error;
+        } else if (error && typeof error === 'object' && 'message' in error) {
+            errorMessage = String(error.message);
+        }
+        return {
+            data: {} as OnboardingAdminData,
+            isSuccessful: false,
+            message: errorMessage,
+        };
+    }
+};
+
+/**
+ * Complete admin signup by setting password and activating account
+ */
+const completeAdminSignup = async (
+    params: CompleteAdminSignupParams
+): Promise<Response<CompleteAdminSignupResponse>> => {
+    try {
+        const { data, error } = await supabase.functions.invoke("complete-admin-signup", {
+            body: params,
+            headers: {
+                Authorization: `Bearer ${supabaseAnonKey}`,
+                "x-app-client-secret": appClientSecret,
+            },
+        });
+
+        if (error) throw error;
+
+        return { data, isSuccessful: true, message: "Signup completed successfully" };
+    } catch (error) {
+        return {
+            data: {} as CompleteAdminSignupResponse,
+            isSuccessful: false,
+            message: error instanceof Error ? error.message : "Failed to complete signup",
+        };
+    }
+};
+
+/**
+ * Edit an administrator using Supabase SDK
+ */
+const editAdmin = async (params: EditAdminParams): Promise<Response<any>> => {
+    try {
+        const { id, ...updateData } = params;
+
+        const { data, error } = await supabase
+            .from("admins")
+            .update(updateData)
+            .eq("id", id)
+            .select("*")
+            .single();
+
+        if (error) throw error;
+
+        return { data, isSuccessful: true, message: "Admin updated successfully" };
+    } catch (error) {
+        throw error;
+    }
+};
+
+/**
+ * Deactivate or activate an administrator by updating the users table
+ */
+const deactivateAdmin = async (params: DeactivateAdminParams): Promise<Response<any>> => {
+    try {
+        const { data, error } = await supabase
+            .from("users")
+            .update({ is_deactivated: params.is_deactivated })
+            .eq("id", params.id)
+            .select("*")
+            .single();
+
+        if (error) throw error;
+
+        return { data, isSuccessful: true, message: params.is_deactivated ? "Admin deactivated successfully" : "Admin activated successfully" };
+    } catch (error) {
+        throw error;
+    }
+};
+
+/**
+ * Resend admin invitation email via edge function
+ */
+const resendAdminInvite = async (params: ResendAdminInviteParams): Promise<Response<any>> => {
+    try {
+        const { data, error } = await supabase.functions.invoke("resend-admin-invite", {
+            body: params,
+            headers: {
+                Authorization: `Bearer ${supabaseAnonKey}`,
+                "x-app-client-secret": appClientSecret,
+            },
+        });
+
+        if (error) throw error;
+
+        return { data, isSuccessful: true, message: "Admin invitation resent successfully" };
+    } catch (error) {
+        return {
+            data: null,
+            isSuccessful: false,
+            message: error instanceof Error ? error.message : "Failed to resend admin invitation",
+        };
+    }
+};
+
+export const handleAdmin = {
+    addAdmin,
+    getOnboardingAdmin,
+    completeAdminSignup,
+    editAdmin,
+    deactivateAdmin,
+    resendAdminInvite,
+};
+
 ```
 
 ### 1. getAllRoles
@@ -211,6 +420,26 @@ export interface CompleteAdminSignupResponse {
     session?: any;
     user?: any;
 }
+
+export interface EditAdminParams {
+    id: string;
+    first_name?: string;
+    last_name?: string;
+    phone_number?: string;
+    profile_photo?: any;
+    profile_photo_hash?: string;
+    role?: "super_admin" | "manager" | "accountant" | "member";
+}
+
+export interface DeactivateAdminParams {
+    id: string;
+    is_deactivated: boolean;
+}
+
+export interface ResendAdminInviteParams {
+    email: string;
+    is_development?: boolean;
+}
 ```
 
 ### 1. addAdmin
@@ -334,6 +563,136 @@ const result = await handleAdmin.completeAdminSignup({
 });
 ```
 
+### 4. editAdmin
+
+Edits an administrator's profile information using Supabase SDK. This function updates the `admins` table directly.
+
+```typescript
+const editAdmin = async (params: EditAdminParams): Promise<Response<any>> => {
+    try {
+        const { id, ...updateData } = params;
+
+        const { data, error } = await supabase
+            .from("admins")
+            .update(updateData)
+            .eq("id", id)
+            .select("*")
+            .single();
+
+        if (error) throw error;
+
+        return { data, isSuccessful: true, message: "Admin updated successfully" };
+    } catch (error) {
+        throw error;
+    }
+};
+```
+
+**Usage:**
+```typescript
+const result = await handleAdmin.editAdmin({
+    id: "admin-uuid-here",
+    first_name: "Jane",
+    last_name: "Smith",
+    role: "manager"
+});
+```
+
+**Notes:**
+- Only the fields provided in the request will be updated
+- The `id` field is required to identify which admin to update
+- Role changes should be done carefully as they affect permissions
+
+### 5. deactivateAdmin
+
+Deactivates or activates an administrator by updating the `users` table. Deactivation acts as a "soft lock" that prevents the user from logging in or performing any API actions.
+
+```typescript
+const deactivateAdmin = async (params: DeactivateAdminParams): Promise<Response<any>> => {
+    try {
+        const { data, error } = await supabase
+            .from("users")
+            .update({ is_deactivated: params.is_deactivated })
+            .eq("id", params.id)
+            .select("*")
+            .single();
+
+        if (error) throw error;
+
+        return { data, isSuccessful: true, message: params.is_deactivated ? "Admin deactivated successfully" : "Admin activated successfully" };
+    } catch (error) {
+        throw error;
+    }
+};
+```
+
+**Usage:**
+```typescript
+// Deactivate an admin
+const result = await handleAdmin.deactivateAdmin({
+    id: "admin-uuid-here",
+    is_deactivated: true
+});
+
+// Reactivate an admin
+const result = await handleAdmin.deactivateAdmin({
+    id: "admin-uuid-here",
+    is_deactivated: false
+});
+```
+
+**Security Guards:**
+- A user cannot deactivate themselves
+- Users with the `super_admin` role cannot be deactivated via this function
+- Only an active `super_admin` can trigger the deactivation logic
+
+### 6. resendAdminInvite
+
+Resends an admin invitation email via the `resend-admin-invite` edge function. This is useful when an admin needs to receive their onboarding invitation again.
+
+```typescript
+const resendAdminInvite = async (params: ResendAdminInviteParams): Promise<Response<any>> => {
+    try {
+        const { data, error } = await supabase.functions.invoke("resend-admin-invite", {
+            body: params,
+            headers: {
+                Authorization: `Bearer ${supabaseAnonKey}`,
+                "x-app-client-secret": appClientSecret,
+            },
+        });
+
+        if (error) throw error;
+
+        return { data, isSuccessful: true, message: "Admin invitation resent successfully" };
+    } catch (error) {
+        return {
+            data: null,
+            isSuccessful: false,
+            message: error instanceof Error ? error.message : "Failed to resend admin invitation",
+        };
+    }
+};
+```
+
+**Usage:**
+```typescript
+const result = await handleAdmin.resendAdminInvite({
+    email: "admin@example.com",
+    is_development: false
+});
+
+if (result.isSuccessful) {
+    console.log("Admin invitation resent successfully");
+} else {
+    console.error("Failed to resend invitation:", result.message);
+}
+```
+
+**Notes:**
+- The function requires the app client secret in headers for security
+- Use `is_development: true` when testing in development environment
+- The admin will receive a new onboarding link via email
+
 ### Export
 
 ```typescript
@@ -341,5 +700,8 @@ export const handleAdmin = {
     addAdmin,
     getOnboardingAdmin,
     completeAdminSignup,
+    editAdmin,
+    deactivateAdmin,
+    resendAdminInvite,
 };
 ```
