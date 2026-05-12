@@ -16,9 +16,9 @@ Inserts a new menu item into the database.
 ```typescript
 const insertMenu = async (
   menuData: MenuInsert
-): Promise<Response<any>> => {
+): Promise<Response<Menu>> => {
   try {
-    const insertData: any = {
+    const insertData: MenuInsert = {
       name: menuData.name,
       description: menuData.description,
       price: menuData.price,
@@ -57,9 +57,9 @@ Updates an existing menu item.
 const updateMenu = async (
   menuId: string,
   menuData: MenuUpdate
-): Promise<Response<any>> => {
+): Promise<Response<Menu>> => {
   try {
-    const updateData: any = {
+    const updateData: MenuUpdate = {
       name: menuData.name,
       description: menuData.description,
       price: menuData.price,
@@ -97,7 +97,7 @@ Soft deletes a menu item using a database function.
 ```typescript
 const deleteMenu = async (menuId: string): Promise<Response<void>> => {
   try {
-    const { error } = await (supabase.rpc as any)('delete_menu', {
+    const { error } = await supabase.rpc('delete_menu', {
       p_menu_id: menuId,
     });
 
@@ -121,7 +121,7 @@ Adds a new menu category type.
 ```typescript
 const addMenuType = async (
   menuTypeData: MenuTypeInsert
-): Promise<Response<any>> => {
+): Promise<Response<Tables<'menu_types'>>> => {
   try {
     const { data, error } = await supabase
       .from('menu_types')
@@ -149,7 +149,7 @@ Retrieves a menu type definition by its name.
 ```typescript
 const getMenuTypeByName = async (
   name: string
-): Promise<Response<any>> => {
+): Promise<Response<Tables<'menu_types'>>> => {
   try {
     const { data, error } = await supabase
       .from('menu_types')
@@ -177,7 +177,7 @@ Retrieves a menu type definition by its ID.
 ```typescript
 const getMenuTypeById = async (
   id: string
-): Promise<Response<any>> => {
+): Promise<Response<Tables<'menu_types'>>> => {
   try {
     const { data, error } = await supabase
       .from('menu_types')
@@ -203,7 +203,7 @@ const getMenuTypeById = async (
 Retrieves all available menu types.
 
 ```typescript
-const getAllMenuTypes = async (): Promise<Response<any>> => {
+const getAllMenuTypes = async (): Promise<Response<Tables<'menu_types'>[]>> => {
   try {
     const { data, error } = await supabase
       .from('menu_types')
@@ -230,7 +230,7 @@ Adds a new group (category of options) to a menu.
 ```typescript
 const addMenuGroup = async (
   menuGroupData: MenuGroupInsert
-): Promise<Response<any>> => {
+): Promise<Response<MenuGroup>> => {
   try {
     const { data, error } = await supabase
       .from('menu_groups')
@@ -259,7 +259,7 @@ Updates an existing menu group.
 const updateMenuGroup = async (
   menuGroupId: string,
   menuGroupData: MenuGroupUpdate
-): Promise<Response<any>> => {
+): Promise<Response<MenuGroup>> => {
   try {
     const { data, error } = await supabase
       .from('menu_groups')
@@ -315,7 +315,7 @@ Adds a specific sub-menu item (option) to a group.
 ```typescript
 const insertSubMenu = async (
   subMenuData: SubMenuInsert
-): Promise<Response<any>> => {
+): Promise<Response<SubMenu>> => {
   try {
     const { data, error } = await supabase
       .from('sub_menus')
@@ -344,7 +344,7 @@ Updates an existing sub-menu item.
 const updateSubMenu = async (
   subMenuId: string,
   subMenuData: SubMenuUpdate
-): Promise<Response<any>> => {
+): Promise<Response<SubMenu>> => {
   try {
     const { data, error } = await supabase
       .from('sub_menus')
@@ -403,7 +403,7 @@ const getMenuByStoreID = async (
   cursorId?: string | null,
   cursorCreatedAt?: string | null,
   limit = 20
-): Promise<Response<Tables<'menus'>[]>> => {
+): Promise<Response<Menu[]>> => {
     try {
         const { data, error } = await supabase.rpc('get_menu_by_store_id', {
             p_store_id: storeId,
@@ -434,7 +434,7 @@ const getMenuItem = async (
   menuId: string
 ): Promise<Response<CompositeTypes<'menu_item_response'>>> => {
   try {
-    const { data, error } = await (supabase.rpc as any)('get_menu_item', {
+    const { data, error } = await supabase.rpc('get_menu_item', {
       p_menu_id: menuId,
     });
 
@@ -487,7 +487,7 @@ import menuApi from '@/api/handleMenu';
 const menuResult = await menuApi.insertMenu({
   name: "Signature Burger",
   description: "Our world-famous beef burger",
-  price: 15.99,
+  price: 15000,
   image_uri: uploadResult.uri, // From Step 1
   image_blur_hash: uploadResult.blur_hash, // From Step 1
   store_id: storeId,
@@ -520,4 +520,100 @@ if (result.isSuccessful) {
   console.log(menu.name);
   console.log(menu.menu_groups); // Array of groups with sub_menus
 }
+```
+
+### Add Menu Groups and Sub-Menus
+To add sub-menu options to a menu item, you must first create a menu group, then add sub-menus that reference that group.
+
+#### Step 1: Create a Menu Group
+A menu group represents a category of options (e.g., "Size", "Toppings", "Sides").
+
+```typescript
+import menuApi from '@/api/handleMenu';
+
+const groupResult = await menuApi.addMenuGroup({
+  menu_id: menuId, // The menu item this group belongs to
+  food_category: "Size",
+  max_item_count: 1, // Maximum number of options user can select
+  is_required: true, // Whether this group is mandatory
+});
+
+if (groupResult.isSuccessful) {
+  const groupId = groupResult.data.id;
+  // Proceed to Step 2
+}
+```
+
+#### Step 2: Add Sub-Menus to the Group
+Sub-menus are the individual options within a group (e.g., "Small", "Medium", "Large").
+
+```typescript
+import menuApi from '@/api/handleMenu';
+
+// Add multiple sub-menu options to the group
+const subMenu1 = await menuApi.insertSubMenu({
+  menu_group_id: groupId, // Reference to the group created in Step 1
+  name: "Small",
+  price: 5000, // Additional cost (can be negative for discounts)
+});
+
+const subMenu2 = await menuApi.insertSubMenu({
+  menu_group_id: groupId,
+  name: "Medium",
+  price: 2000, // Additional 2000 currency units
+});
+
+const subMenu3 = await menuApi.insertSubMenu({
+  menu_group_id: groupId,
+  name: "Large",
+  price: 4000, // Additional 4000 currency units
+});
+```
+
+#### Complete Example: Adding Multiple Groups with Options
+
+```typescript
+import menuApi from '@/api/handleMenu';
+
+// Create a "Size" group
+const sizeGroup = await menuApi.addMenuGroup({
+  menu_id: menuId,
+  food_category: "Size",
+  max_item_count: 1, // Maximum number of options user can select
+  is_required: true, // Whether this group is mandatory
+});
+
+// Add size options
+await menuApi.insertSubMenu({
+  menu_group_id: sizeGroup.data.id,
+  name: "Small",
+  price: 4000,
+});
+
+await menuApi.insertSubMenu({
+  menu_group_id: sizeGroup.data.id,
+  name: "Medium",
+  price: 2000,
+});
+
+// Create a "Toppings" group (multiple selections allowed)
+const toppingsGroup = await menuApi.addMenuGroup({
+  menu_id: menuId,
+  food_category: "Toppings",
+  max_item_count: 5, // Maximum number of options user can select
+  is_required: false, // Whether this group is mandatory
+});
+
+// Add topping options
+await menuApi.insertSubMenu({
+  menu_group_id: toppingsGroup.data.id,
+  name: "Cheese",
+  price: 500,
+});
+
+await menuApi.insertSubMenu({
+  menu_group_id: toppingsGroup.data.id,
+  name: "Bacon",
+  price: 1000,
+});
 ```
