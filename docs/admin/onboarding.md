@@ -39,6 +39,120 @@ To prevent system lockout and unauthorized escalation, the following guards are 
 
 ---
 
+## 📋 Roles API
+
+The roles API provides functions to retrieve role definitions and user counts for role-based access control.
+
+### File: `api/handleRoles.ts`
+
+```typescript
+import { supabase } from "@/lib/supabase";
+import { Response } from "@/types/api";
+import { CompositeTypes } from "@/types/database.types";
+
+export interface Role {
+    id: string;
+    role_type: "super_admin" | "owner" | "manager" | "accountant" | "member";
+    user_type: "user" | "vendor" | "admin";
+    readable_role_name: string;
+    description: string;
+    permissions: string[];
+    created_at: string;
+    updated_at: string;
+}
+```
+
+### 1. getAllRoles
+
+Retrieves all roles from the roles table, ordered by user_type and role_type.
+
+```typescript
+const getAllRoles = async (): Promise<Response<Role[]>> => {
+    try {
+        const { data, error } = await supabase
+            .from("roles")
+            .select("*")
+            .order("user_type", { ascending: true })
+            .order("role_type", { ascending: true });
+
+        if (error) throw error;
+
+        return { data, isSuccessful: true, message: "Roles fetched successfully" };
+    } catch (error) {
+        throw error;
+    }
+};
+```
+
+**Usage:**
+```typescript
+const result = await handleRoles.getAllRoles();
+```
+
+### 2. getRoleByUserType
+
+Retrieves roles filtered by user type (admin, vendor, or user).
+
+```typescript
+const getRoleByUserType = async (userType: "admin" | "vendor" | "user"): Promise<Response<Role[]>> => {
+    try {
+        const { data, error } = await supabase
+            .from("roles")
+            .select("*")
+            .eq("user_type", userType)
+            .order("role_type", { ascending: true });
+
+        if (error) throw error;
+
+        return { data, isSuccessful: true, message: "Roles fetched successfully" };
+    } catch (error) {
+        throw error;
+    }
+};
+```
+
+**Usage:**
+```typescript
+const result = await handleRoles.getRoleByUserType("admin");
+```
+
+### 3. getAdminRolesBreakdown
+
+Retrieves admin roles with user count breakdown. This function calls the database function `get_admin_roles_breakdown()` which returns all admin roles with the count of users for each role. Only admins can call this function.
+
+```typescript
+const getAdminRolesBreakdown = async (): Promise<Response<CompositeTypes<'admin_roles_breakdown'>[]>> => {
+    try {
+        const { data, error } = await supabase.rpc("get_admin_roles_breakdown");
+
+        if (error) throw error;
+
+        return { data, isSuccessful: true, message: "Admin roles breakdown fetched successfully" };
+    } catch (error) {
+        throw error;
+    }
+};
+```
+
+**Usage:**
+```typescript
+const result = await handleRoles.getAdminRolesBreakdown();
+```
+
+**Security Note:** This function can only be called by authenticated admin users. The database function enforces this restriction.
+
+### Export
+
+```typescript
+export const handleRoles = {
+    getAllRoles,
+    getRoleByUserType,
+    getAdminRolesBreakdown,
+};
+```
+
+---
+
 ## � Security: Shared Secret Verification
 
 The public onboarding functions (`get-onboarding-admin`, `complete-admin-signup`, `get-onboarding-vendor`, `complete-vendor-signup`) require a shared secret to ensure requests originate from the legitimate app client.
