@@ -6,6 +6,488 @@ This document provides the complete API implementation and integration guide for
 
 ```typescript
 @/Users/ovieokomite-iffie/Documents/mobile apps/linqUp/api/handleMenu.ts:1-479
+import { supabase, Tables } from '@/lib/supabase';
+import { Response } from '@/types/api';
+import { CompositeTypes, TablesInsert, TablesUpdate } from '@/types/database.types';
+
+type MenuType = 'main' | 'side' | 'drinks' | 'snacks';
+
+type MenuInsert = TablesInsert<'menus'>;
+type MenuTypeInsert = TablesInsert<'menu_types'>;
+type MenuGroupUpdate = TablesUpdate<'menu_groups'>;
+type SubMenuInsert = TablesInsert<'sub_menus'>;
+type MenuUpdate = TablesUpdate<'menus'>;
+type MenuGroupInsert = TablesInsert<'menu_groups'>;
+type SubMenuUpdate = TablesUpdate<'sub_menus'>;
+type Menu = Tables<'menus'>;
+type MenuGroup = Tables<'menu_groups'>;
+type SubMenu = Tables<'sub_menus'>;
+
+/**
+ * Insert a new menu item
+ * @param menuData - The menu data to insert
+ * @returns The inserted menu item or error
+ */
+const insertMenu = async (
+  menuData: MenuInsert
+): Promise<Response<Menu>> => {
+  try {
+    const insertData: MenuInsert = {
+      name: menuData.name,
+      description: menuData.description,
+      price: menuData.price,
+      discount_price: menuData.discount_price,
+      type: menuData.type || 'main',
+      image_uri: menuData.image_uri,
+      image_blur_hash: menuData.image_blur_hash,
+      is_out_of_stock: menuData.is_out_of_stock ?? false,
+      store_id: menuData.store_id,
+    }; // Type assertion needed until database types are regenerated after migration
+
+    const { data, error } = await supabase
+      .from('menus')
+      .insert(insertData)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return {
+      isSuccessful: true,
+      message: 'Menu item inserted successfully',
+      data: data,
+    };
+  } catch (error) {
+    console.error('Error inserting menu:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update an existing menu item
+ * @param menuId - The ID of the menu to update
+ * @param menuData - The menu data to update
+ * @returns The updated menu item or error
+ */
+const updateMenu = async (
+  menuId: string,
+  menuData: MenuUpdate
+): Promise<Response<Menu>> => {
+  try {
+    const updateData: MenuUpdate = {
+      name: menuData.name,
+      description: menuData.description,
+      price: menuData.price,
+      discount_price: menuData.discount_price,
+      type: menuData.type,
+      image_uri: menuData.image_uri,
+      image_blur_hash: menuData.image_blur_hash,
+      is_out_of_stock: menuData.is_out_of_stock,
+    }; // Type assertion needed until database types are regenerated after migration
+
+    const { data, error } = await supabase
+      .from('menus')
+      .update(updateData)
+      .eq('id', menuId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return {
+      isSuccessful: true,
+      message: 'Menu item updated successfully',
+      data: data,
+    };
+  } catch (error) {
+    console.error('Error updating menu:', error);
+    throw error;
+  }
+};
+
+/**
+ * Soft delete a menu item by calling the database function
+ * This marks the menu as deleted and changes store_id to a placeholder UUID
+ * @param menuId - The ID of the menu to delete
+ * @returns Success or error
+ */
+const deleteMenu = async (menuId: string): Promise<Response<void>> => {
+    try {
+        const { error } = await supabase.rpc('delete_menu', {
+        p_menu_id: menuId,
+        }); // Type assertion needed until database types are regenerated after migration
+
+        if (error) throw error;
+
+        return {
+        isSuccessful: true,
+        message: 'Menu item deleted successfully',
+        data: undefined,
+        };
+    } catch (error) {
+        console.error('Error deleting menu:', error);
+        throw error;
+    }
+};
+
+/**
+ * Insert a new menu type
+ * @param menuTypeData - The menu type data to insert
+ * @returns The inserted menu type or error
+ */
+const addMenuType = async (
+  menuTypeData: MenuTypeInsert
+): Promise<Response<Tables<'menu_types'>>> => {
+  try {
+    const { data, error } = await supabase
+      .from('menu_types')
+      .insert(menuTypeData)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return {
+      isSuccessful: true,
+      message: 'Menu type inserted successfully',
+      data: data,
+    };
+  } catch (error) {
+    console.error('Error inserting menu type:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get a menu type by name
+ * @param name - The name of the menu type
+ * @returns The menu type or error
+ */
+const getMenuTypeByName = async (
+  name: string
+): Promise<Response<Tables<'menu_types'>>> => {
+  try {
+    const { data, error } = await supabase
+      .from('menu_types')
+      .select()
+      .eq('name', name)
+      .single();
+
+    if (error) throw error;
+
+    return {
+      isSuccessful: true,
+      message: 'Menu type retrieved successfully',
+      data: data,
+    };
+  } catch (error) {
+    console.error('Error retrieving menu type by name:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get a menu type by ID
+ * @param id - The ID of the menu type
+ * @returns The menu type or error
+ */
+const getMenuTypeById = async (
+  id: string
+): Promise<Response<Tables<'menu_types'>>> => {
+  try {
+    const { data, error } = await supabase
+      .from('menu_types')
+      .select()
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+
+    return {
+      isSuccessful: true,
+      message: 'Menu type retrieved successfully',
+      data: data,
+    };
+  } catch (error) {
+    console.error('Error retrieving menu type by ID:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get all menu types
+ * @returns All menu types or error
+ */
+const getAllMenuTypes = async (): Promise<Response<Tables<'menu_types'>[]>> => {
+  try {
+    const { data, error } = await supabase
+      .from('menu_types')
+      .select()
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    return {
+      isSuccessful: true,
+      message: 'Menu types retrieved successfully',
+      data: data,
+    };
+  } catch (error) {
+    console.error('Error retrieving menu types:', error);
+    throw error;
+  }
+};
+
+/**
+ * Insert a new menu group
+ * @param menuGroupData - The menu group data to insert
+ * @returns The inserted menu group or error
+ */
+const addMenuGroup = async (
+  menuGroupData: MenuGroupInsert
+): Promise<Response<MenuGroup>> => {
+  try {
+    const { data, error } = await supabase
+      .from('menu_groups')
+      .insert(menuGroupData)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return {
+      isSuccessful: true,
+      message: 'Menu group inserted successfully',
+      data: data,
+    };
+  } catch (error) {
+    console.error('Error inserting menu group:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update an existing menu group
+ * @param menuGroupId - The ID of the menu group to update
+ * @param menuGroupData - The menu group data to update
+ * @returns The updated menu group or error
+ */
+const updateMenuGroup = async (
+  menuGroupId: string,
+  menuGroupData: MenuGroupUpdate
+): Promise<Response<MenuGroup>> => {
+  try {
+    const { data, error } = await supabase
+      .from('menu_groups')
+      .update(menuGroupData)
+      .eq('id', menuGroupId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return {
+      isSuccessful: true,
+      message: 'Menu group updated successfully',
+      data: data,
+    };
+  } catch (error) {
+    console.error('Error updating menu group:', error);
+    throw error;
+  }
+};
+
+/**
+ * Delete a menu group
+ * @param menuGroupId - The ID of the menu group to delete
+ * @returns Success or error
+ */
+const deleteMenuGroup = async (
+  menuGroupId: string
+): Promise<Response<void>> => {
+  try {
+    const { error } = await supabase
+      .from('menu_groups')
+      .delete()
+      .eq('id', menuGroupId);
+
+    if (error) throw error;
+
+    return {
+      isSuccessful: true,
+      message: 'Menu group deleted successfully',
+      data: undefined,
+    };
+  } catch (error) {
+    console.error('Error deleting menu group:', error);
+    throw error;
+  }
+};
+
+/**
+ * Insert a new sub menu
+ * @param subMenuData - The sub menu data to insert
+ * @returns The inserted sub menu or error
+ */
+const insertSubMenu = async (
+  subMenuData: SubMenuInsert
+): Promise<Response<SubMenu>> => {
+  try {
+    const { data, error } = await supabase
+      .from('sub_menus')
+      .insert(subMenuData)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return {
+      isSuccessful: true,
+      message: 'Sub menu inserted successfully',
+      data: data,
+    };
+  } catch (error) {
+    console.error('Error inserting sub menu:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update an existing sub menu
+ * @param subMenuId - The ID of the sub menu to update
+ * @param subMenuData - The sub menu data to update
+ * @returns The updated sub menu or error
+ */
+const updateSubMenu = async (
+  subMenuId: string,
+  subMenuData: SubMenuUpdate
+): Promise<Response<SubMenu>> => {
+  try {
+    const { data, error } = await supabase
+      .from('sub_menus')
+      .update(subMenuData)
+      .eq('id', subMenuId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return {
+      isSuccessful: true,
+      message: 'Sub menu updated successfully',
+      data: data,
+    };
+  } catch (error) {
+    console.error('Error updating sub menu:', error);
+    throw error;
+  }
+};
+
+/**
+ * Delete a sub menu
+ * @param subMenuId - The ID of the sub menu to delete
+ * @returns Success or error
+ */
+const deleteSubMenu = async (
+  subMenuId: string
+): Promise<Response<void>> => {
+  try {
+    const { error } = await supabase
+      .from('sub_menus')
+      .delete()
+      .eq('id', subMenuId);
+
+    if (error) throw error;
+
+    return {
+      isSuccessful: true,
+      message: 'Sub menu deleted successfully',
+      data: undefined,
+    };
+  } catch (error) {
+    console.error('Error deleting sub menu:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get menus by store ID with cursor pagination
+ * @param storeId - The store ID
+ * @param cursorId - The cursor ID for pagination (optional)
+ * @param cursorCreatedAt - The cursor created_at timestamp for pagination (optional)
+ * @param limit - The number of records to return (default 20)
+ * @returns The menus or error
+ */
+const getMenuByStoreID = async (
+  storeId: string,
+  cursorId?: string | null,
+  cursorCreatedAt?: string | null,
+  limit = 20
+): Promise<Response<Menu[]>> => {
+    try {
+        const { data, error } = await supabase.rpc('get_menu_by_store_id', {
+            p_store_id: storeId,
+            p_limit: limit,
+            ...(cursorId && { p_cursor_id: cursorId }),
+            ...(cursorCreatedAt && { p_cursor_created_at: cursorCreatedAt }),
+        });
+
+        if (error) throw error;
+
+        return {
+            isSuccessful: true,
+            message: 'Menus retrieved successfully',
+            data: data,
+        };
+    } catch (error) {
+        console.error('Error retrieving menus by store ID:', error);
+        throw error;
+    }
+};
+
+/**
+ * Get a single menu item with nested menu_groups and sub_menus
+ * @param menuId - The menu ID
+ * @returns The menu item with nested data or error
+ */
+const getMenuItem = async (
+  menuId: string
+): Promise<Response<CompositeTypes<'menu_item_response'>>> => {
+  try {
+    const { data, error } = await supabase.rpc('get_menu_item', {
+      p_menu_id: menuId,
+    });
+
+    if (error) throw error;
+
+    return {
+      isSuccessful: true,
+      message: 'Menu item retrieved successfully',
+      data: data,
+    };
+  } catch (error) {
+    console.error('Error retrieving menu item:', error);
+    throw error;
+  }
+};
+
+export default {
+    insertMenu,
+    updateMenu,
+    deleteMenu,
+    addMenuType,
+    getMenuTypeByName,
+    getMenuTypeById,
+    getAllMenuTypes,
+    addMenuGroup,
+    updateMenuGroup,
+    deleteMenuGroup,
+    insertSubMenu,
+    updateSubMenu,
+    deleteSubMenu,
+    getMenuByStoreID,
+    getMenuItem,
+};
 ```
 
 ## Functions
