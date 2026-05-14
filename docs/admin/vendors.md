@@ -6,7 +6,7 @@ This document covers vendor-related operations for administrators.
 
 ```typescript
 @/Users/ovieokomite-iffie/Documents/mobile apps/linqUp/api/handleVendors.ts:1-257
-import { supabase } from "@/lib/supabase";
+import { Enums, supabase } from "@/lib/supabase";
 import { Response } from "@/types/api";
 import { CompositeTypes, Database } from "@/types/database.types";
 import { UploadWithBlurhashResponse } from "./handleUpload";
@@ -115,6 +115,17 @@ export interface GetAllBusinessesParams {
     limit?: number;
     cursorBusinessName?: string;
     cursorId?: string;
+    createdAt?: string;
+    status?: Database["public"]["Enums"]["business_status_enum"];
+}
+
+export interface SearchBusinessParams {
+    searchQuery: string;
+    limit?: number;
+    cursorBusinessName?: string;
+    cursorId?: string;
+    createdAt?: string;
+    status?: Database["public"]["Enums"]["business_status_enum"];
 }
 
 /**
@@ -223,6 +234,8 @@ const getAllBusinesses = async (
             p_limit: params.limit || 10,
             p_cursor_business_name: params.cursorBusinessName ?? undefined,
             p_cursor_id: params.cursorId ?? undefined,
+            p_created_at: params.createdAt ?? undefined,
+            p_status: params.status ?? undefined,
         });
 
         if (error) throw error;
@@ -233,6 +246,35 @@ const getAllBusinesses = async (
             data: [],
             isSuccessful: false,
             message: error instanceof Error ? error.message : "Failed to fetch businesses",
+        };
+    }
+};
+
+/**
+ * Search businesses with fuzzy text search using pg_trgm
+ * Admin only - requires admin authentication
+ */
+const searchBusiness = async (
+    params: SearchBusinessParams
+): Promise<Response<CompositeTypes<'business_item_response'>[]>> => {
+    try {
+        const { data, error } = await supabase.rpc("search_business", {
+            p_search_query: params.searchQuery,
+            p_limit: params.limit || 10,
+            p_cursor_business_name: params.cursorBusinessName ?? undefined,
+            p_cursor_id: params.cursorId ?? undefined,
+            p_created_at: params.createdAt ?? undefined,
+            p_status: params.status ?? undefined,
+        });
+
+        if (error) throw error;
+
+        return { data: data || [], isSuccessful: true, message: "Search completed successfully" };
+    } catch (error) {
+        return {
+            data: [],
+            isSuccessful: false,
+            message: error instanceof Error ? error.message : "Failed to search businesses",
         };
     }
 };
@@ -290,6 +332,7 @@ export const handleVendors = {
     addBusiness,
     addVendor,
     getAllBusinesses,
+    searchBusiness,
     getAllBusinessSummary,
     resendVendorInvite,
 };
@@ -422,6 +465,25 @@ const nextPage = await handleVendors.getAllBusinesses({
     cursorBusinessName: lastBusiness.business_name,
     cursorId: lastBusiness.id
 });
+
+// Filter by creation date (businesses created after a specific time)
+const filteredByDate = await handleVendors.getAllBusinesses({
+    limit: 10,
+    createdAt: '2024-01-01T00:00:00Z'
+});
+
+// Filter by status
+const activeBusinesses = await handleVendors.getAllBusinesses({
+    limit: 10,
+    status: 'active'
+});
+
+// Combine filters
+const filteredResults = await handleVendors.getAllBusinesses({
+    limit: 10,
+    createdAt: '2024-01-01T00:00:00Z',
+    status: 'active'
+});
 ```
 
 ### Response Type
@@ -448,11 +510,17 @@ const nextPage = await handleVendors.getAllBusinesses({
 }
 ```
 
+### Filter Parameters
+
+- `createdAt` (optional): Filter to return businesses created after this timestamp (ISO 8601 format)
+- `status` (optional): Filter by business status (`"active" | "suspended" | "pending_activation"`)
+
 ### Cursor Pagination
 
 - Results are sorted by `business_name` then `id` in ascending order
 - To paginate, pass the `business_name` and `id` of the last item from the previous page as `cursorBusinessName` and `cursorId`
 - The `limit` parameter controls the number of results per page (default: 10)
+- Filters can be combined with cursor pagination for efficient data retrieval
 
 ## Get Business Summary
 
@@ -532,9 +600,89 @@ if (result.isSuccessful) {
 - Use `is_development: true` when testing in development environment
 - The vendor will receive a new onboarding link via email
 
+## Search Businesses
+
+Searches for businesses using fuzzy text search on business name and address. This operation requires admin authentication and uses PostgreSQL's pg_trgm extension for improved search capabilities.
+
+### Usage Example
+
+```typescript
+import { handleVendors } from '@/api/handleVendors';
+import { Database } from '@/types/database.types';
+
+// Basic search
+const result = await handleVendors.searchBusiness({
+    searchQuery: 'restaurant'
+});
+
+if (result.isSuccessful) {
+    const businesses = result.data;
+    businesses.forEach(business => {
+        console.log(business.business_name);
+        console.log(business.business_address);
+    });
+}
+
+// Search with filters
+const filteredSearch = await handleVendors.searchBusiness({
+    searchQuery: 'cafe',
+    limit: 20,
+    status: 'active',
+    createdAt: '2024-01-01T00:00:00Z'
+});
+
+// Paginated search
+const lastBusiness = businesses[businesses.length - 1];
+const nextPage = await handleVendors.searchBusiness({
+    searchQuery: 'restaurant',
+    limit: 10,
+    cursorBusinessName: lastBusiness.business_name,
+    cursorId: lastBusiness.id
+});
+```
+
+### Request Parameters (SearchBusinessParams)
+
+```typescript
+{
+    searchQuery: string;           // Required: Search term for fuzzy matching
+    limit?: number;                // Optional: Results per page (default: 10)
+    cursorBusinessName?: string;   // Optional: Cursor for pagination
+    cursorId?: string;             // Optional: Cursor for pagination
+    createdAt?: string;           // Optional: Filter by creation date (ISO 8601)
+    status?: Database["public"]["Enums"]["business_status_enum"]; // Optional: Filter by status
+}
+```
+
+### Response Type
+
+```typescript
+{
+    data: Database["public"]["CompositeTypes"]["business_item_response"][];
+    isSuccessful: boolean;
+    message: string;
+}
+```
+
+### Search Features
+
+- Uses PostgreSQL pg_trgm extension for fuzzy text matching
+- Searches both `business_name` and `business_address` fields
+- Results are ordered by similarity score (most relevant first), then by business name and id
+- Supports partial matches and typo tolerance
+- Can be combined with date and status filters
+- Supports cursor pagination for large result sets
+
+### Notes
+
+- The search uses similarity scoring to rank results by relevance
+- A similarity threshold of 0.1 is applied to filter out very poor matches
+- The `%` operator (trigram matching) provides additional fuzzy matching capabilities
+- For best performance, ensure the pg_trgm extension is enabled in your PostgreSQL database
+
 ### Notes for Admin Functions
 
-- Both `getAllBusinesses` and `getAllBusinessSummary` require admin authentication
+- `getAllBusinesses`, `searchBusiness`, and `getAllBusinessSummary` require admin authentication
 - These functions use `security definer` and perform admin-only checks internally
 - They return type-safe responses using CompositeTypes from database.types.ts
 - Handle errors gracefully by checking `isSuccessful` before accessing data
