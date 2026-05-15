@@ -134,6 +134,7 @@ export interface GetAllBusinessSummaryParams {
     status?: Database["public"]["Enums"]["business_status_enum"];
     startDate?: string;
     endDate?: string;
+    searchQuery?: string;
 }
 
 /**
@@ -301,6 +302,7 @@ const getAllBusinessSummary = async (params: GetAllBusinessSummaryParams = {}): 
             p_status: params.status ?? undefined,
             p_start_date: params.startDate ?? undefined,
             p_end_date: params.endDate ?? undefined,
+            p_search_query: params.searchQuery ?? undefined,
         });
 
         if (error) throw error;
@@ -557,7 +559,8 @@ import { CompositeTypes } from '@/types/database.types';
 const result = await handleVendors.getAllBusinessSummary({
     status: 'active',
     startDate: '2024-01-01T00:00:00Z',
-    endDate: '2024-01-31T23:59:59Z'
+    endDate: '2024-01-31T23:59:59Z',
+    searchQuery: 'restaurant'
 });
 
 if (result.isSuccessful) {
