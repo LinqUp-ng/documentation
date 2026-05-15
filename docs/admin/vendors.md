@@ -115,17 +115,25 @@ export interface GetAllBusinessesParams {
     limit?: number;
     cursorBusinessName?: string;
     cursorId?: string;
-    createdAt?: string;
+    startDate?: string;
+    endDate?: string;
     status?: Database["public"]["Enums"]["business_status_enum"];
 }
 
 export interface SearchBusinessParams {
-    searchQuery: string;
+    searchQuery?: string;
     limit?: number;
     cursorBusinessName?: string;
     cursorId?: string;
-    createdAt?: string;
+    startDate?: string;
+    endDate?: string;
     status?: Database["public"]["Enums"]["business_status_enum"];
+}
+
+export interface GetAllBusinessSummaryParams {
+    status?: Database["public"]["Enums"]["business_status_enum"];
+    startDate?: string;
+    endDate?: string;
 }
 
 /**
@@ -234,7 +242,8 @@ const getAllBusinesses = async (
             p_limit: params.limit || 10,
             p_cursor_business_name: params.cursorBusinessName ?? undefined,
             p_cursor_id: params.cursorId ?? undefined,
-            p_created_at: params.createdAt ?? undefined,
+            p_start_date: params.startDate ?? undefined,
+            p_end_date: params.endDate ?? undefined,
             p_status: params.status ?? undefined,
         });
 
@@ -259,11 +268,12 @@ const searchBusiness = async (
 ): Promise<Response<CompositeTypes<'business_item_response'>[]>> => {
     try {
         const { data, error } = await supabase.rpc("search_business", {
-            p_search_query: params.searchQuery,
+            p_search_query: params.searchQuery ?? undefined,
             p_limit: params.limit || 10,
             p_cursor_business_name: params.cursorBusinessName ?? undefined,
             p_cursor_id: params.cursorId ?? undefined,
-            p_created_at: params.createdAt ?? undefined,
+            p_start_date: params.startDate ?? undefined,
+            p_end_date: params.endDate ?? undefined,
             p_status: params.status ?? undefined,
         });
 
@@ -283,11 +293,15 @@ const searchBusiness = async (
  * Get business summary statistics
  * Admin only - requires admin authentication
  */
-const getAllBusinessSummary = async (): Promise<
+const getAllBusinessSummary = async (params: GetAllBusinessSummaryParams = {}): Promise<
     Response<CompositeTypes<'business_summary_response'> | null>
 > => {
     try {
-        const { data, error } = await supabase.rpc("get_all_business_summary");
+        const { data, error } = await supabase.rpc("get_all_business_summary", {
+            p_status: params.status ?? undefined,
+            p_start_date: params.startDate ?? undefined,
+            p_end_date: params.endDate ?? undefined,
+        });
 
         if (error) throw error;
 
@@ -469,7 +483,14 @@ const nextPage = await handleVendors.getAllBusinesses({
 // Filter by creation date (businesses created after a specific time)
 const filteredByDate = await handleVendors.getAllBusinesses({
     limit: 10,
-    createdAt: '2024-01-01T00:00:00Z'
+    startDate: '2024-01-01T00:00:00Z'
+});
+
+// Filter by creation date range
+const filteredByDateRange = await handleVendors.getAllBusinesses({
+    limit: 10,
+    startDate: '2024-01-01T00:00:00Z',
+    endDate: '2024-01-31T23:59:59Z'
 });
 
 // Filter by status
@@ -481,7 +502,7 @@ const activeBusinesses = await handleVendors.getAllBusinesses({
 // Combine filters
 const filteredResults = await handleVendors.getAllBusinesses({
     limit: 10,
-    createdAt: '2024-01-01T00:00:00Z',
+    startDate: '2024-01-01T00:00:00Z',
     status: 'active'
 });
 ```
@@ -512,7 +533,8 @@ const filteredResults = await handleVendors.getAllBusinesses({
 
 ### Filter Parameters
 
-- `createdAt` (optional): Filter to return businesses created after this timestamp (ISO 8601 format)
+- `startDate` (optional): Filter to return businesses created on/after this timestamp (ISO 8601)
+- `endDate` (optional): Filter to return businesses created on/before this timestamp (ISO 8601)
 - `status` (optional): Filter by business status (`"active" | "suspended" | "pending_activation"`)
 
 ### Cursor Pagination
@@ -532,7 +554,11 @@ Retrieves summary statistics for all businesses. This operation requires admin a
 import { handleVendors } from '@/api/handleVendors';
 import { CompositeTypes } from '@/types/database.types';
 
-const result = await handleVendors.getAllBusinessSummary();
+const result = await handleVendors.getAllBusinessSummary({
+    status: 'active',
+    startDate: '2024-01-01T00:00:00Z',
+    endDate: '2024-01-31T23:59:59Z'
+});
 
 if (result.isSuccessful) {
     const summary = result.data; // CompositeTypes<'business_summary_response'>
@@ -628,7 +654,7 @@ const filteredSearch = await handleVendors.searchBusiness({
     searchQuery: 'cafe',
     limit: 20,
     status: 'active',
-    createdAt: '2024-01-01T00:00:00Z'
+    startDate: '2024-01-01T00:00:00Z'
 });
 
 // Paginated search
@@ -645,11 +671,12 @@ const nextPage = await handleVendors.searchBusiness({
 
 ```typescript
 {
-    searchQuery: string;           // Required: Search term for fuzzy matching
+    searchQuery?: string;          // Optional: When omitted/empty, returns all businesses (still supports status/date/pagination)
     limit?: number;                // Optional: Results per page (default: 10)
     cursorBusinessName?: string;   // Optional: Cursor for pagination
     cursorId?: string;             // Optional: Cursor for pagination
-    createdAt?: string;           // Optional: Filter by creation date (ISO 8601)
+    startDate?: string;            // Optional: Filter by created_at start (ISO 8601)
+    endDate?: string;              // Optional: Filter by created_at end (ISO 8601)
     status?: Database["public"]["Enums"]["business_status_enum"]; // Optional: Filter by status
 }
 ```
