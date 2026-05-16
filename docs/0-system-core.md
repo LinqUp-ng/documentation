@@ -331,24 +331,48 @@ const uploadFile = async ({ id, uri, mimeType, bucketName }) => {
   return { uri: data.path, isSuccessful: true };
 };
 
+export type UploadWithBlurhashResponse = {
+    uri: string;
+    blur_hash: string;
+    width: number;
+    height: number;
+    isSuccessful: boolean;
+    message: string;
+};
+
+
 // 2. Upload with Automatic Server-Side Blurhash (Recommended)
 // This calls a Deno Edge function to generate blurhash and upload in one step
-const uploadWithBlurhash = async ({ id, uri, bucketName, fileName }) => {
-  const arraybuffer = await fetch(uri).then((res) => res.arrayBuffer());
-  const { data, error } = await supabase.functions.invoke(
-    "upload-with-blurhash",
-    {
-      body: arraybuffer,
-      headers: {
-        "x-bucket-name": bucketName,
-        "x-user-id": id,
-        "x-file-name": fileName || "image",
-        "content-type": "image/webp",
-      },
-    },
-  );
-  if (error) throw error;
-  return data; // Returns { uri, blur_hash, width, height }
+const uploadWithBlurhash = async (
+    { id, uri, mimeType, bucketName, fileName, fileExtension }:
+        UploadFileParams,
+): Promise<UploadWithBlurhashResponse> => {
+    try {
+        const arraybuffer = await fetch(uri).then((res) => res.arrayBuffer());
+
+        const { data, error } = await supabase.functions.invoke(
+            "upload-with-blurhash",
+            {
+                body: arraybuffer,
+                headers: {
+                    "x-bucket-name": bucketName,
+                    "x-user-id": id,
+                    "x-file-name": fileName || "image",
+                    "x-app-client-secret": process.env.EXPO_PUBLIC_APP_CLIENT_SECRET ?? "",
+                    "content-type": mimeType || "image/webp",
+                },
+            },
+        );
+
+        if (error) {
+            console.error("Error invoking upload-with-blurhash:", error);
+            throw error;
+        }
+
+        return data;
+    } catch (error: any) {
+        throw error;
+    }
 };
 
 // 3. Bulk Blurhash Generation (For existing images or Next.js server-side)
