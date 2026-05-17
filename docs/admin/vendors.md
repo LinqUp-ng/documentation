@@ -96,6 +96,7 @@ export interface AddVendorParams {
     vendor_email: string;
     vendor_role?: "owner" | "manager" | "member";
     business_id: string;
+    store_id: string;
     is_development?: boolean;
 }
 
@@ -324,10 +325,6 @@ const resendVendorInvite = async (params: ResendVendorInviteParams): Promise<Res
     try {
         const { data, error } = await supabase.functions.invoke("resend-vendor-invite", {
             body: params,
-            headers: {
-                Authorization: `Bearer ${supabaseAnonKey}`,
-                "x-app-client-secret": appClientSecret,
-            },
         });
 
         if (error) throw error;
@@ -449,6 +446,73 @@ console.log(result.data.onboardingToken); // Share this with the vendor for onbo
 - The vendor will use this token to retrieve their onboarding details and complete signup
 - Store logo and cover photo should be uploaded first using the upload API
 - Working hours are optional but recommended for proper store operations
+
+## Add Vendor
+
+Adds a vendor to an existing business and store. This operation requires business owner or super_admin authentication.
+
+### Endpoint
+`POST /functions/v1/add-vendor`
+
+### Request Body (AddVendorParams)
+
+```typescript
+{
+  vendor_first_name: string;
+  vendor_last_name: string;
+  vendor_phone_number?: string;
+  vendor_profile_photo?: {
+    url: string;
+    blur_hash?: string;
+  } | null;
+  vendor_profile_photo_hash?: string;
+  vendor_email: string;
+  vendor_role?: "owner" | "manager" | "member";
+  business_id: string;
+  store_id: string;
+  is_development?: boolean;
+}
+```
+
+### Response (AddVendorResponse)
+
+```typescript
+{
+  success: boolean;
+  businessId: string;
+  vendorUserId: string;
+  onboardingToken: string;
+}
+```
+
+### Usage Example
+
+```typescript
+import { handleVendors } from '@/api/handleVendors';
+
+const result = await handleVendors.addVendor({
+  vendor_first_name: "Jane",
+  vendor_last_name: "Smith",
+  vendor_email: "jane@example.com",
+  vendor_phone_number: "+2348012345678",
+  vendor_role: "manager",
+  business_id: "abc123-def456",
+  store_id: "store-xyz-789"
+});
+
+if (result.isSuccessful) {
+  console.log(result.data.onboardingToken); // Share this with the vendor for onboarding
+  console.log(result.data.vendorUserId);    // The new vendor's user ID
+}
+```
+
+### Notes
+
+- The `store_id` is required to associate the vendor with a specific store within the business
+- The `onboardingToken` in the response should be securely shared with the vendor to complete their account setup
+- The vendor will use this token to retrieve their onboarding details and complete signup
+- The `vendor_role` determines the level of access the vendor will have (owner, manager, or member)
+- Vendor profile photo should be uploaded first using the upload API
 
 ## Get All Businesses
 

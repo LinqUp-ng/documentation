@@ -242,10 +242,6 @@ const resendAdminInvite = async (params: ResendAdminInviteParams): Promise<Respo
     try {
         const { data, error } = await supabase.functions.invoke("resend-admin-invite", {
             body: params,
-            headers: {
-                Authorization: `Bearer ${supabaseAnonKey}`,
-                "x-app-client-secret": appClientSecret,
-            },
         });
 
         if (error) throw error;
@@ -655,10 +651,6 @@ const resendAdminInvite = async (params: ResendAdminInviteParams): Promise<Respo
     try {
         const { data, error } = await supabase.functions.invoke("resend-admin-invite", {
             body: params,
-            headers: {
-                Authorization: `Bearer ${supabaseAnonKey}`,
-                "x-app-client-secret": appClientSecret,
-            },
         });
 
         if (error) throw error;
