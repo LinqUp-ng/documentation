@@ -1,50 +1,13 @@
-# Onboarding
+# Admin Management
 
-Administrative accounts are controlled via specialized Edge Functions to maintain strict relational integrity and enforce high-level security permissions.
+This document covers administrator management operations for the platform.
 
----
-
-## ➕ Adding an Administrator
-New administrators are onboarded through the `add-admin` function. This function creates the necessary Auth and Public records in a single transactional flow.
-
-### Security Rules:
-- **Authorization**: Only users with the `super_admin` role can invoke this function.
-- **Workflow**:
-    1. Generates a secure random password.
-    2. Creates the Auth user with `admin_role` metadata.
-    3. Syncs public profile to the `admins` table.
-    4. Sends a welcome email with credentials via Resend.
-
----
-
-## 🚫 Deactivating an Administrator
-Administrators can be deactivated using the `deactivateAdmin` function. Deactivation acts as a "soft lock" that prevents the user from logging in or performing any API actions.
-
-### 🔒 Critical Security Guards:
-To prevent system lockout and unauthorized escalation, the following guards are enforced at the Edge Function level:
-1. **Self-Protection**: A user **cannot deactivate themselves**.
-2. **Super Admin Guard**: Users with the `super_admin` role **cannot be deactivated** via this function. This ensures that the primary system controllers remain accessible.
-3. **Role Check**: Only an active `super_admin` can trigger the deactivation logic.
-
----
-
-## 🛡️ Role Hierarchy
-
-| Role | Permissions |
-| :--- | :--- |
-| **Super Admin** | Full access. Can create/deactivate all other admin accounts. |
-| **Manager** | Operational access. Can manage vendors and products. |
-| **Accountant** | Financial access. Read-only ledger and transaction history. |
-| **Member** | Support access. Can respond to user queries and moderate content. |
-
----
-
-## 📋 Admin API Reference
+## API Implementation
 
 ### File: `api/handleAdmin.ts`
 
 ```typescript
-import { supabase } from "@/lib/supabase";
+import { supabase, Tables } from "@/lib/supabase";
 import { Response } from "@/types/api";
 import { CompositeTypes, TablesUpdate } from "@/types/database.types";
 
@@ -52,7 +15,11 @@ const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "";
 const appClientSecret = process.env.EXPO_PUBLIC_APP_CLIENT_SECRET || "";
 ```
 
-### Types
+---
+
+## Types
+
+### Admin Management Types
 
 ```typescript
 export interface AddAdminParams {
@@ -85,7 +52,11 @@ export interface CompleteAdminSignupResponse {
     session?: any;
     user?: any;
 }
+```
 
+### Admin Operations Types
+
+```typescript
 export interface EditAdminParams {
     id: string;
     first_name?: string;
@@ -105,7 +76,11 @@ export interface ResendAdminInviteParams {
     email: string;
     is_development?: boolean;
 }
+```
 
+### Admin Query Types
+
+```typescript
 export interface SearchAdminsParams {
     searchQuery?: string;
     limit?: number;
@@ -143,9 +118,11 @@ export interface ExportAdminsParams {
 
 ---
 
+## Functions
+
 ### 1. addAdmin
 
-Adds a new administrator via the `add-admin` edge function.
+Creates a new administrator via edge function. This operation requires super_admin authentication.
 
 ```typescript
 const addAdmin = async (params: AddAdminParams): Promise<Response<any>> => {
@@ -167,22 +144,47 @@ const addAdmin = async (params: AddAdminParams): Promise<Response<any>> => {
 };
 ```
 
-**Usage:**
+**Endpoint:** `POST /functions/v1/add-admin`
+
+**Request Body (AddAdminParams):**
+```typescript
+{
+    first_name: string;
+    last_name: string;
+    email: string;
+    role: "super_admin" | "manager" | "accountant" | "member";
+    phone_number?: string;
+    profile_photo?: { url: string; blur_hash?: string } | null;
+    profile_photo_hash?: string;
+}
+```
+
+**Usage Example:**
 ```typescript
 const result = await handleAdmin.addAdmin({
-    first_name: "John",
+    first_name: "Jane",
     last_name: "Doe",
-    email: "john@example.com",
+    email: "jane.doe@linqup.com",
     role: "manager",
-    phone_number: "+1234567890"
+    phone_number: "+2348012345678"
 });
+
+if (result.isSuccessful) {
+    console.log("Admin added successfully");
+    // The new admin will receive an invitation email
+}
 ```
+
+**Notes:**
+- The new admin will receive an invitation email with a link to set their password
+- Profile photo should be uploaded first using the upload API
+- Only super_admins can add new administrators
 
 ---
 
 ### 2. getOnboardingAdmin
 
-Retrieves onboarding admin details via the `get-onboarding-admin` edge function. This is a public function that requires no authentication but requires the app client secret.
+Retrieves the admin's onboarding information using the token provided. This is a public endpoint that does not require authentication but requires the app client secret.
 
 ```typescript
 const getOnboardingAdmin = async (token: string): Promise<Response<OnboardingAdminData>> => {
@@ -223,7 +225,7 @@ const getOnboardingAdmin = async (token: string): Promise<Response<OnboardingAdm
 
 **Usage:**
 ```typescript
-const result = await handleAdmin.getOnboardingAdmin("abc123token");
+const result = await handleAdmin.getOnboardingAdmin(token);
 
 if (result.isSuccessful) {
     console.log("Email:", result.data.email);
@@ -232,13 +234,16 @@ if (result.isSuccessful) {
 }
 ```
 
+**Notes:**
+- This function is used during the admin onboarding flow
+- The token is provided via the invitation email link
+- See [Admin Onboarding](/docs/admin/onboarding) for the complete onboarding flow
+
 ---
 
 ### 3. completeAdminSignup
 
-Completes admin signup by setting a password and activating the account via the `complete-admin-signup` edge function.
-
-**Note:** After successfully completing signup, the user should call the standard login endpoint to establish their session. See `api/handleAuth.ts` for the login implementation.
+Completes the admin signup by setting a password and activating the account.
 
 ```typescript
 const completeAdminSignup = async (
@@ -266,24 +271,39 @@ const completeAdminSignup = async (
 };
 ```
 
-**Usage:**
+**Endpoint:** `POST /functions/v1/complete-admin-signup`
+
+**Request Body (CompleteAdminSignupParams):**
+```typescript
+{
+    token: string;    // The onboarding token
+    password: string; // The new password (must meet security requirements)
+}
+```
+
+**Usage Example:**
 ```typescript
 const result = await handleAdmin.completeAdminSignup({
-    token: "abc123token",
-    password: "SecurePassword123!"
+    token: onboardingToken,
+    password: "securePassword123"
 });
 
-if (result.isSuccessful && result.data.success) {
-    console.log("User ID:", result.data.userId);
+if (result.isSuccessful) {
+    console.log("Account activated for user:", result.data.userId);
     // Now call login to establish session
 }
 ```
+
+**Notes:**
+- The password must meet the platform's security requirements
+- After successful signup, the admin should log in to establish a session
+- See [Admin Onboarding](/docs/admin/onboarding) for the complete onboarding flow
 
 ---
 
 ### 4. editAdmin
 
-Edits an administrator's profile information using Supabase SDK. This function updates the `admins` table directly.
+Edits an administrator's information using Supabase SDK. This operation requires appropriate authentication.
 
 ```typescript
 const editAdmin = async (params: TablesUpdate<'admins'>): Promise<Response<any>> => {
@@ -310,26 +330,38 @@ const editAdmin = async (params: TablesUpdate<'admins'>): Promise<Response<any>>
 };
 ```
 
-**Usage:**
+**Usage Example:**
 ```typescript
+// Update admin profile
 const result = await handleAdmin.editAdmin({
-    id: "admin-uuid-here",
-    first_name: "Jane",
-    last_name: "Smith",
-    role: "manager"
+    id: 'admin-uuid-here',
+    first_name: 'Jane',
+    last_name: 'Smith',
+    phone_number: '+2348012345678'
+});
+
+if (result.isSuccessful) {
+    console.log("Admin updated successfully");
+    console.log("Updated admin:", result.data);
+}
+
+// Update admin role (super_admin only)
+const roleUpdate = await handleAdmin.editAdmin({
+    id: 'admin-uuid-here',
+    role: 'manager'
 });
 ```
 
 **Notes:**
-- Only the fields provided in the request will be updated
-- The `id` field is required to identify which admin to update
-- Role changes should be done carefully as they affect permissions
+- Admins can typically update their own profile information
+- Role changes usually require super_admin privileges
+- Profile photo should be uploaded first using the upload API
 
 ---
 
 ### 5. deactivateAdmin
 
-Deactivates or activates an administrator by updating the `users` table. Deactivation acts as a "soft lock" that prevents the user from logging in or performing any API actions.
+Deactivates or activates an administrator by updating the users table. This operation requires super_admin authentication.
 
 ```typescript
 const deactivateAdmin = async (params: DeactivateAdminParams): Promise<Response<any>> => {
@@ -350,25 +382,33 @@ const deactivateAdmin = async (params: DeactivateAdminParams): Promise<Response<
 };
 ```
 
-**Usage:**
+**Usage Example:**
 ```typescript
 // Deactivate an admin
 const result = await handleAdmin.deactivateAdmin({
-    id: "admin-uuid-here",
+    id: 'admin-uuid-here',
     is_deactivated: true
 });
 
+if (result.isSuccessful) {
+    console.log("Admin deactivated successfully");
+}
+
 // Reactivate an admin
-const result = await handleAdmin.deactivateAdmin({
-    id: "admin-uuid-here",
+const reactivateResult = await handleAdmin.deactivateAdmin({
+    id: 'admin-uuid-here',
     is_deactivated: false
 });
+
+if (reactivateResult.isSuccessful) {
+    console.log("Admin activated successfully");
+}
 ```
 
-**Security Guards:**
-- A user cannot deactivate themselves
-- Users with the `super_admin` role cannot be deactivated via this function
-- Only an active `super_admin` can trigger the deactivation logic
+**Notes:**
+- Deactivated admins cannot log in or access the system
+- This action is reversible - set `is_deactivated: false` to reactivate
+- Only super_admins can deactivate other administrators
 
 ---
 
@@ -396,7 +436,7 @@ const resendAdminInvite = async (params: ResendAdminInviteParams): Promise<Respo
 };
 ```
 
-**Usage:**
+**Usage Example:**
 ```typescript
 const result = await handleAdmin.resendAdminInvite({
     email: "admin@example.com",
@@ -410,11 +450,16 @@ if (result.isSuccessful) {
 }
 ```
 
+**Notes:**
+- Use `is_development: true` when testing in development environment
+- The admin will receive a new onboarding link via email
+- Only super_admins can resend admin invitations
+
 ---
 
 ### 7. searchAdmins
 
-Searches admins with fuzzy text search and pagination via database function. This operation requires admin authentication.
+Searches admins with fuzzy search and pagination via database function. This operation requires admin authentication.
 
 ```typescript
 const searchAdmins = async (params: SearchAdminsParams): Promise<Response<CompositeTypes<'admin_item_response'>[]>> => {
@@ -443,7 +488,7 @@ const searchAdmins = async (params: SearchAdminsParams): Promise<Response<Compos
 };
 ```
 
-**Usage:**
+**Usage Example:**
 ```typescript
 // Basic search
 const result = await handleAdmin.searchAdmins({
@@ -454,7 +499,9 @@ const result = await handleAdmin.searchAdmins({
 if (result.isSuccessful) {
     const admins = result.data;
     admins.forEach(admin => {
-        console.log(admin.email, admin.first_name, admin.last_name, admin.role);
+        console.log(admin.first_name, admin.last_name, admin.role);
+        console.log('Email:', admin.email);
+        console.log('Last Sign In:', admin.last_sign_in_at);
     });
 }
 
@@ -484,12 +531,12 @@ const recentAdmins = await handleAdmin.searchAdmins({
 **Request Parameters (SearchAdminsParams):**
 ```typescript
 {
-    searchQuery?: string;          // Optional: Fuzzy search on name/email
-    limit?: number;                // Optional: Results per page (default: 10)
-    cursorFirstName?: string;      // Optional: Cursor for pagination
-    cursorId?: string;             // Optional: Cursor for pagination
-    startDate?: string;            // Optional: Filter by created_at start (ISO 8601)
-    endDate?: string;              // Optional: Filter by created_at end (ISO 8601)
+    searchQuery?: string;        // Optional: Fuzzy search on name/email
+    limit?: number;              // Optional: Results per page (default: 10)
+    cursorFirstName?: string;    // Optional: Cursor for pagination
+    cursorId?: string;           // Optional: Cursor for pagination
+    startDate?: string;          // Optional: Filter by created_at start (ISO 8601)
+    endDate?: string;            // Optional: Filter by created_at end (ISO 8601)
     isPendingActivation?: boolean; // Optional: Filter by pending activation status
 }
 ```
@@ -545,13 +592,10 @@ const getAdminSummary = async (params: Omit<SearchAdminsParams, 'limit' | 'curso
 };
 ```
 
-**Usage:**
+**Usage Example:**
 ```typescript
-const result = await handleAdmin.getAdminSummary({
-    startDate: '2024-01-01T00:00:00Z',
-    endDate: '2024-01-31T23:59:59Z',
-    searchQuery: 'manager'
-});
+// Get overall summary
+const result = await handleAdmin.getAdminSummary({});
 
 if (result.isSuccessful) {
     const summary = result.data;
@@ -559,23 +603,29 @@ if (result.isSuccessful) {
     console.log('Active admins:', summary.active_admin_count);
     console.log('Pending activation:', summary.pending_activation_admin_count);
 }
+
+// Get summary for a specific period
+const monthlySummary = await handleAdmin.getAdminSummary({
+    startDate: '2024-01-01T00:00:00Z',
+    endDate: '2024-01-31T23:59:59Z'
+});
+
+// Get summary with search filter
+const filteredSummary = await handleAdmin.getAdminSummary({
+    searchQuery: 'manager'
+});
 ```
 
 **Response Type:**
 ```typescript
 {
-    data: AdminSummaryResponse;
+    data: {
+        all_admin_count: number;
+        active_admin_count: number;
+        pending_activation_admin_count: number;
+    };
     isSuccessful: boolean;
     message: string;
-}
-```
-
-**Admin Summary Response:**
-```typescript
-{
-    all_admin_count: number;
-    active_admin_count: number;
-    pending_activation_admin_count: number;
 }
 ```
 
@@ -601,7 +651,7 @@ const exportAdmins = async (params: ExportAdminsParams): Promise<Response<{ path
 };
 ```
 
-**Usage:**
+**Usage Example:**
 ```typescript
 const result = await handleAdmin.exportAdmins({
     startDate: '2024-01-01T00:00:00Z',
@@ -620,10 +670,10 @@ if (result.isSuccessful) {
 **Request Parameters (ExportAdminsParams):**
 ```typescript
 {
-    startDate?: string;      // Optional: Filter by created_at start (ISO 8601)
-    endDate?: string;        // Optional: Filter by created_at end (ISO 8601)
+    startDate?: string;          // Optional: Filter by created_at start (ISO 8601)
+    endDate?: string;            // Optional: Filter by created_at end (ISO 8601)
     isPendingActivation?: boolean; // Optional: Filter by pending activation status
-    searchQuery?: string;    // Optional: Fuzzy search filter
+    searchQuery?: string;        // Optional: Fuzzy search filter
 }
 ```
 
@@ -663,7 +713,7 @@ const getAdminById = async (id: string): Promise<Response<Tables<'admins'> | nul
 };
 ```
 
-**Usage:**
+**Usage Example:**
 ```typescript
 const result = await handleAdmin.getAdminById('admin-uuid-here');
 
@@ -686,198 +736,42 @@ if (result.isSuccessful && result.data) {
 
 ---
 
-## 📋 Roles API Reference
-
-### File: `api/handleRoles.ts`
+## Export
 
 ```typescript
-import { supabase } from "@/lib/supabase";
-import { Response } from "@/types/api";
-import { CompositeTypes } from "@/types/database.types";
-```
-
-### Types
-
-```typescript
-export interface Role {
-    id: string;
-    role_type: "super_admin" | "owner" | "manager" | "accountant" | "member";
-    user_type: "user" | "vendor" | "admin";
-    readable_role_name: string;
-    description: string;
-    permissions: string[];
-    created_at: string;
-    updated_at: string;
-}
-```
-
----
-
-### 1. getAllRoles
-
-Retrieves all roles from the roles table, ordered by user_type and role_type.
-
-```typescript
-const getAllRoles = async (): Promise<Response<Role[]>> => {
-    try {
-        const { data, error } = await supabase
-            .from("roles")
-            .select("*")
-            .order("user_type", { ascending: true })
-            .order("role_type", { ascending: true });
-
-        if (error) throw error;
-
-        return { data, isSuccessful: true, message: "Roles fetched successfully" };
-    } catch (error) {
-        throw error;
-    }
-};
-```
-
-**Usage:**
-```typescript
-const result = await handleRoles.getAllRoles();
-
-if (result.isSuccessful) {
-    result.data.forEach(role => {
-        console.log(`${role.role_type} (${role.user_type}): ${role.description}`);
-        console.log('Permissions:', role.permissions.join(', '));
-    });
-}
-```
-
----
-
-### 2. getRoleByUserType
-
-Retrieves roles filtered by user type (admin, vendor, or user).
-
-```typescript
-const getRoleByUserType = async (userType: "admin" | "vendor" | "user"): Promise<Response<Role[]>> => {
-    try {
-        const { data, error } = await supabase
-            .from("roles")
-            .select("*")
-            .eq("user_type", userType)
-            .order("role_type", { ascending: true });
-
-        if (error) throw error;
-
-        return { data, isSuccessful: true, message: "Roles fetched successfully" };
-    } catch (error) {
-        throw error;
-    }
-};
-```
-
-**Usage:**
-```typescript
-// Get all admin roles
-const adminRoles = await handleRoles.getRoleByUserType("admin");
-
-// Get all vendor roles
-const vendorRoles = await handleRoles.getRoleByUserType("vendor");
-
-// Get all user roles
-const userRoles = await handleRoles.getRoleByUserType("user");
-```
-
----
-
-### 3. getAdminRolesBreakdown
-
-Retrieves admin roles with user count breakdown. This function calls the database function `get_admin_roles_breakdown()` which returns all admin roles with the count of users for each role. Only admins can call this function.
-
-```typescript
-const getAdminRolesBreakdown = async (): Promise<Response<CompositeTypes<'admin_roles_breakdown'>[]>> => {
-    try {
-        const { data, error } = await supabase.rpc("get_admin_roles_breakdown");
-
-        if (error) throw error;
-
-        return { data, isSuccessful: true, message: "Admin roles breakdown fetched successfully" };
-    } catch (error) {
-        throw error;
-    }
-};
-```
-
-**Usage:**
-```typescript
-const result = await handleRoles.getAdminRolesBreakdown();
-
-if (result.isSuccessful) {
-    result.data.forEach(role => {
-        console.log(`${role.role_type}: ${role.user_count} users`);
-    });
-}
-```
-
-**Security Note:** This function can only be called by authenticated admin users. The database function enforces this restriction.
-
----
-
-### 4. getStoreRolesBreakdown
-
-Retrieves store/vendor roles with user count breakdown for a specific store. This function calls the database function `get_store_roles_breakdown(store_id)` which returns all vendor roles (owner, manager, accountant, member) with the count of users for each role in the specified store. Only admins or vendors with access to the store can call this function.
-
-```typescript
-const getStoreRolesBreakdown = async (storeId: string): Promise<Response<CompositeTypes<'store_roles_breakdown'>[]>> => {
-    try {
-        const { data, error } = await supabase.rpc("get_store_roles_breakdown", { p_store_id: storeId });
-
-        if (error) throw error;
-
-        return { data, isSuccessful: true, message: "Store roles breakdown fetched successfully" };
-    } catch (error) {
-        throw error;
-    }
-};
-```
-
-**Usage:**
-```typescript
-const storeId = "store-uuid-here";
-const result = await handleRoles.getStoreRolesBreakdown(storeId);
-
-if (result.isSuccessful) {
-    result.data.forEach(role => {
-        console.log(`${role.role_type}: ${role.user_count} users`);
-    });
-}
-```
-
-**Security Note:** This function can only be called by authenticated admin users or vendors who have access to the specified store. The database function enforces this restriction.
-
----
-
-### Export
-
-```typescript
-export const handleRoles = {
-    getAllRoles,
-    getRoleByUserType,
-    getAdminRolesBreakdown,
-    getStoreRolesBreakdown,
+export const handleAdmin = {
+    addAdmin,
+    getOnboardingAdmin,
+    completeAdminSignup,
+    editAdmin,
+    deactivateAdmin,
+    resendAdminInvite,
+    searchAdmins,
+    getAdminSummary,
+    exportAdmins,
+    getAdminById,
 };
 ```
 
 ---
 
-## 🛡️ Security: Shared Secret Verification
+## Security Notes
 
-The public onboarding functions (`get-onboarding-admin`, `complete-admin-signup`, `get-onboarding-vendor`, `complete-vendor-signup`) require a shared secret to ensure requests originate from the legitimate app client.
+- **Super Admin Functions**: `addAdmin`, `deactivateAdmin`, and `resendAdminInvite` require `super_admin` role
+- **Admin Functions**: `searchAdmins`, `getAdminSummary`, and `exportAdmins` require admin authentication
+- **Onboarding Functions**: `getOnboardingAdmin` and `completeAdminSignup` are public but require the app client secret header
+- **Self-Service**: `editAdmin` can typically be used by admins to update their own profiles
+- All functions use `security definer` database functions where applicable and perform role checks internally
 
-**Server-side (Supabase Edge Functions):**
-- Environment variable: `APP_CLIENT_SECRET`
-- Header to check: `x-app-client-secret`
-- Returns 401 Unauthorized if missing or mismatched
+---
 
-**Client-side (App):**
-- Environment variable: `EXPO_PUBLIC_APP_CLIENT_SECRET`
-- Sent in headers: `x-app-client-secret`
+## Admin Roles
 
-**Setup:**
-1. Set `APP_CLIENT_SECRET` as a secret in your Supabase project
-2. Add `EXPO_PUBLIC_APP_CLIENT_SECRET` to your `.env` file with the same value
+The platform supports the following admin roles:
+
+| Role | Description | Permissions |
+|------|-------------|-------------|
+| `super_admin` | Full system access | All admin operations including managing other admins |
+| `manager` | Operational management | Manage vendors, view analytics, handle support |
+| `accountant` | Financial operations | View transactions, manage withdrawals, financial reports |
+| `member` | Basic access | View-only access to assigned areas |

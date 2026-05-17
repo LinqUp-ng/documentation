@@ -969,6 +969,190 @@ if (result.isSuccessful) {
 
 ---
 
+### 12. getStoreById
+
+Retrieves a store by its unique identifier with all columns.
+
+```typescript
+const getStoreById = async (id: string): Promise<Response<Tables<'stores'> | null>> => {
+    try {
+        const { data, error } = await supabase
+            .from("stores")
+            .select("*")
+            .eq("id", id)
+            .single();
+
+        if (error) throw error;
+
+        return { data, isSuccessful: true, message: "Store retrieved successfully" };
+    } catch (error) {
+        throw error;
+    }
+};
+```
+
+**Usage Example:**
+```typescript
+const result = await handleVendors.getStoreById('store-uuid-here');
+
+if (result.isSuccessful && result.data) {
+    console.log('Store Name:', result.data.store_name);
+    console.log('Store Address:', result.data.store_address);
+    console.log('Business ID:', result.data.business_id);
+}
+```
+
+**Response Type:**
+```typescript
+{
+    data: Tables<'stores'> | null;
+    isSuccessful: boolean;
+    message: string;
+}
+```
+
+---
+
+### 13. getStoresByBusinessId
+
+Retrieves all stores associated with a specific business.
+
+```typescript
+const getStoresByBusinessId = async (businessId: string): Promise<Response<Tables<'stores'>[]>> => {
+    try {
+        const { data, error } = await supabase
+            .from("stores")
+            .select("*")
+            .eq("business_id", businessId);
+
+        if (error) throw error;
+
+        return { data: data || [], isSuccessful: true, message: "Store retrieved successfully" };
+    } catch (error) {
+        throw error;
+    }
+};
+```
+
+**Usage Example:**
+```typescript
+const result = await handleVendors.getStoresByBusinessId('business-uuid-here');
+
+if (result.isSuccessful) {
+    const stores = result.data;
+    stores.forEach(store => {
+        console.log('Store:', store.store_name, store.store_address);
+    });
+}
+```
+
+**Response Type:**
+```typescript
+{
+    data: Tables<'stores'>[];
+    isSuccessful: boolean;
+    message: string;
+}
+```
+
+---
+
+### 14. getVendorById
+
+Retrieves a vendor by their unique identifier with all columns.
+
+```typescript
+const getVendorById = async (id: string): Promise<Response<Tables<'vendors'> | null>> => {
+    try {
+        const { data, error } = await supabase
+            .from("vendors")
+            .select("*")
+            .eq("id", id)
+            .single();
+
+        if (error) throw error;
+
+        return { data, isSuccessful: true, message: "Vendor retrieved successfully" };
+    } catch (error) {
+        return {
+            data: null,
+            isSuccessful: false,
+            message: error instanceof Error ? error.message : "Failed to fetch vendor",
+        };
+    }
+};
+```
+
+**Usage Example:**
+```typescript
+const result = await handleVendors.getVendorById('vendor-uuid-here');
+
+if (result.isSuccessful && result.data) {
+    console.log('Vendor:', result.data.first_name, result.data.last_name);
+    console.log('Email:', result.data.vendor_email);
+    console.log('Role:', result.data.vendor_role);
+}
+```
+
+**Response Type:**
+```typescript
+{
+    data: Tables<'vendors'> | null;
+    isSuccessful: boolean;
+    message: string;
+}
+```
+
+---
+
+### 15. getBusinessById
+
+Retrieves a business by its unique identifier with all columns.
+
+```typescript
+const getBusinessById = async (id: string): Promise<Response<Tables<'businesses'> | null>> => {
+    try {
+        const { data, error } = await supabase
+            .from("businesses")
+            .select("*")
+            .eq("id", id)
+            .single();
+
+        if (error) throw error;
+
+        return { data, isSuccessful: true, message: "Business retrieved successfully" };
+    } catch (error) {
+        return {
+            data: null,
+            isSuccessful: false,
+            message: error instanceof Error ? error.message : "Failed to fetch business",
+        };
+    }
+};
+```
+
+**Usage Example:**
+```typescript
+const result = await handleVendors.getBusinessById('business-uuid-here');
+
+if (result.isSuccessful && result.data) {
+    console.log('Business:', result.data.business_name);
+    console.log('Status:', result.data.status);
+    console.log('CAC Number:', result.data.cac_number);
+}
+```
+
+**Response Type:**
+```typescript
+{
+    data: Tables<'businesses'> | null;
+    isSuccessful: boolean;
+    message: string;
+}
+```
+
+---
+
 ## Export
 
 ```typescript
@@ -984,6 +1168,10 @@ export const handleVendors = {
     getAllVendorSummary,
     resendVendorInvite,
     exportVendors,
+    getStoreById,
+    getStoresByBusinessId,
+    getVendorById,
+    getBusinessById,
 };
 ```
 
