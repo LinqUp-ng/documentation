@@ -4,8 +4,9 @@ This document covers vendor-related operations for administrators.
 
 ## API Implementation
 
+### File: `api/handleVendors.ts`
+
 ```typescript
-@/Users/ovieokomite-iffie/Documents/mobile apps/linqUp/api/handleVendors.ts:1-257
 import { Enums, supabase } from "@/lib/supabase";
 import { Response } from "@/types/api";
 import { CompositeTypes, Database } from "@/types/database.types";
@@ -13,7 +14,15 @@ import { UploadWithBlurhashResponse } from "./handleUpload";
 
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "";
 const appClientSecret = process.env.EXPO_PUBLIC_APP_CLIENT_SECRET || "";
+```
 
+---
+
+## Types
+
+### Working Hours
+
+```typescript
 export type DayOfWeek = Database["public"]["Enums"]["day_of_the_week"];
 
 export interface WorkingHour {
@@ -22,7 +31,11 @@ export interface WorkingHour {
     closing_time: string;
     is_opened?: boolean;
 }
+```
 
+### Onboarding Types
+
+```typescript
 export interface OnboardingVendorData {
     email: string;
     business_name: string;
@@ -45,15 +58,11 @@ export interface CompleteVendorSignupResponse {
     session?: any;
     user?: any;
 }
+```
 
-export interface CompleteAdminSignupResponse {
-    success: boolean;
-    message: string;
-    userId: string;
-    session?: any;
-    user?: any;
-}
+### Business Management Types
 
+```typescript
 export interface AddBusinessParams {
     business_name: string;
     business_address?: string;
@@ -111,7 +120,11 @@ export interface ResendVendorInviteParams {
     email: string;
     is_development?: boolean;
 }
+```
 
+### Business Query Types
+
+```typescript
 export interface GetAllBusinessesParams {
     limit?: number;
     cursorBusinessName?: string;
@@ -137,11 +150,53 @@ export interface GetAllBusinessSummaryParams {
     endDate?: string;
     searchQuery?: string;
 }
+```
 
-/**
- * Get onboarding vendor details via edge function
- * Public function - no auth required
- */
+### Vendor Query Types
+
+```typescript
+export interface SearchVendorsParams {
+    storeId: string;
+    searchQuery?: string;
+    limit?: number;
+    cursorFirstName?: string;
+    cursorId?: string;
+    startDate?: string;
+    endDate?: string;
+    isPendingActivation?: boolean;
+}
+
+export interface GetAllVendorSummaryParams {
+    storeId: string;
+    isPendingActivation?: boolean;
+    startDate?: string;
+    endDate?: string;
+    searchQuery?: string;
+}
+
+export interface ExportVendorsParams {
+    storeId: string;
+    startDate?: string;
+    endDate?: string;
+    isPendingActivation?: boolean;
+    searchQuery?: string;
+}
+
+export interface ExportVendorsResponse {
+    path: string;
+    url: string;
+}
+```
+
+---
+
+## Functions
+
+### 1. getOnboardingVendor
+
+Retrieves the vendor's onboarding information using the token provided by the administrator. This is a public endpoint that does not require authentication but requires the app client secret.
+
+```typescript
 const getOnboardingVendor = async (token: string): Promise<Response<OnboardingVendorData>> => {
     try {
         const { data, error } = await supabase.functions.invoke("get-onboarding-vendor", {
@@ -163,15 +218,33 @@ const getOnboardingVendor = async (token: string): Promise<Response<OnboardingVe
         };
     }
 };
+```
 
-/**
- * Complete vendor signup by setting password and activating account
- */
+**Usage:**
+```typescript
+const result = await handleVendors.getOnboardingVendor(token);
+
+if (result.isSuccessful) {
+    console.log("Business:", result.data.business_name);
+    console.log("Email:", result.data.email);
+    console.log("Role:", result.data.vendor_role);
+    console.log("Name:", result.data.first_name, result.data.last_name);
+}
+```
+
+See [Vendor Onboarding](/docs/vendor/onboarding) for the complete onboarding flow.
+
+---
+
+### 2. completeVendorSignup
+
+Completes the vendor signup by setting a password and activating the account.
+
+```typescript
 const completeVendorSignup = async (
     params: CompleteVendorSignupParams
 ): Promise<CompleteVendorSignupResponse> => {
     try {
-        
         const { data, error } = await supabase.functions.invoke("complete-vendor-signup", {
             body: params,
             headers: {
@@ -179,23 +252,38 @@ const completeVendorSignup = async (
                 "x-app-client-secret": appClientSecret,
             },
         });
-        console.log("🚀 ~ completeVendorSignup ~ data:", data)
-        console.log("🚀 ~ completeVendorSignup ~ error:", JSON.stringify(error))
-    
-        if (error) {
-            throw error
-        }
-    
+
+        if (error) throw error;
+
         return data as CompleteVendorSignupResponse;
     } catch (error) {
         throw error;
     }
 };
+```
 
-/**
- * Add a new business with store and owner vendor via edge function
- * Requires super_admin authentication
- */
+**Usage:**
+```typescript
+const result = await handleVendors.completeVendorSignup({
+    token: onboardingToken,
+    password: "securePassword123"
+});
+
+if (result.success) {
+    console.log("Account activated for user:", result.userId);
+    // Now call login to establish session
+}
+```
+
+See [Vendor Onboarding](/docs/vendor/onboarding) for the complete onboarding flow.
+
+---
+
+### 3. addBusiness
+
+Creates a new business with store and owner vendor. This operation requires super_admin authentication.
+
+```typescript
 const addBusiness = async (
     params: AddBusinessParams
 ): Promise<Response<AddBusinessResponse>> => {
@@ -211,11 +299,90 @@ const addBusiness = async (
         throw error;
     }
 };
+```
 
-/**
- * Add a vendor to an existing business via edge function
- * Requires business owner or super_admin authentication
- */
+**Endpoint:** `POST /functions/v1/add-business`
+
+**Request Body (AddBusinessParams):**
+```typescript
+{
+    business_name: string;
+    business_address?: string;
+    cac_number?: string;
+    tax_id?: string;
+    cac_document_url?: string;
+    store_name: string;
+    store_address?: string;
+    store_city?: string;
+    store_state?: string;
+    store_latitude?: number;
+    store_longitude?: number;
+    store_logo?: { url: string; blur_hash?: string } | null;
+    store_cover_photo?: any;
+    store_cover_photo_blur_hash?: string;
+    vendor_first_name: string;
+    vendor_last_name: string;
+    vendor_phone_number?: string;
+    vendor_profile_photo?: any;
+    vendor_profile_photo_hash?: string;
+    vendor_email: string;
+    working_hours?: WorkingHour[];
+    is_development?: boolean;
+}
+```
+
+**Response (AddBusinessResponse):**
+```typescript
+{
+    success: boolean;
+    businessId: string;
+    storeId: string;
+    vendorUserId: string;
+    onboardingToken: string;
+}
+```
+
+**Usage Example:**
+```typescript
+const result = await handleVendors.addBusiness({
+    business_name: "Example Restaurant",
+    business_address: "123 Main St",
+    store_name: "Downtown Location",
+    store_city: "Lagos",
+    store_state: "Lagos",
+    vendor_first_name: "John",
+    vendor_last_name: "Doe",
+    vendor_email: "john@example.com",
+    working_hours: [
+        {
+            day_of_the_week: "monday",
+            opening_time: "09:00",
+            closing_time: "22:00",
+            is_opened: true
+        }
+    ]
+});
+
+if (result.isSuccessful) {
+    console.log("Business ID:", result.data.businessId);
+    console.log("Store ID:", result.data.storeId);
+    console.log("Onboarding Token:", result.data.onboardingToken);
+    // Share the onboarding token with the vendor
+}
+```
+
+**Notes:**
+- The `onboardingToken` in the response should be securely shared with the vendor to complete their account setup
+- Store logo and cover photo should be uploaded first using the upload API
+- Working hours are optional but recommended for proper store operations
+
+---
+
+### 4. addVendor
+
+Adds a vendor to an existing business and store. This operation requires business owner or super_admin authentication.
+
+```typescript
 const addVendor = async (
     params: AddVendorParams
 ): Promise<Response<AddVendorResponse>> => {
@@ -231,11 +398,67 @@ const addVendor = async (
         throw error;
     }
 };
+```
 
-/**
- * Get all businesses with cursor pagination
- * Admin only - requires admin authentication
- */
+**Endpoint:** `POST /functions/v1/add-vendor`
+
+**Request Body (AddVendorParams):**
+```typescript
+{
+    vendor_first_name: string;
+    vendor_last_name: string;
+    vendor_phone_number?: string;
+    vendor_profile_photo?: { url: string; blur_hash?: string } | null;
+    vendor_profile_photo_hash?: string;
+    vendor_email: string;
+    vendor_role?: "owner" | "manager" | "member";
+    business_id: string;
+    store_id: string;
+    is_development?: boolean;
+}
+```
+
+**Response (AddVendorResponse):**
+```typescript
+{
+    success: boolean;
+    businessId: string;
+    vendorUserId: string;
+    onboardingToken: string;
+}
+```
+
+**Usage Example:**
+```typescript
+const result = await handleVendors.addVendor({
+    vendor_first_name: "Jane",
+    vendor_last_name: "Smith",
+    vendor_email: "jane@example.com",
+    vendor_phone_number: "+2348012345678",
+    vendor_role: "manager",
+    business_id: "abc123-def456",
+    store_id: "store-xyz-789"
+});
+
+if (result.isSuccessful) {
+    console.log("Vendor User ID:", result.data.vendorUserId);
+    console.log("Onboarding Token:", result.data.onboardingToken);
+    // Share the onboarding token with the vendor
+}
+```
+
+**Notes:**
+- The `store_id` is required to associate the vendor with a specific store within the business
+- The `vendor_role` determines the level of access the vendor will have (owner, manager, or member)
+- Vendor profile photo should be uploaded first using the upload API
+
+---
+
+### 5. getAllBusinesses
+
+Retrieves a paginated list of all businesses. This operation requires admin authentication.
+
+```typescript
 const getAllBusinesses = async (
     params: GetAllBusinessesParams = {}
 ): Promise<Response<CompositeTypes<'business_item_response'>[]>> => {
@@ -260,11 +483,84 @@ const getAllBusinesses = async (
         };
     }
 };
+```
 
-/**
- * Search businesses with fuzzy text search using pg_trgm
- * Admin only - requires admin authentication
- */
+**Usage Example:**
+```typescript
+// Get first page of businesses
+const result = await handleVendors.getAllBusinesses({ limit: 10 });
+
+if (result.isSuccessful) {
+    const businesses = result.data;
+    businesses.forEach(business => {
+        console.log(business.business_name);
+        console.log(business.number_of_stores);
+        console.log(business.status);
+    });
+}
+
+// Get next page using cursor
+const lastBusiness = businesses[businesses.length - 1];
+const nextPage = await handleVendors.getAllBusinesses({
+    limit: 10,
+    cursorBusinessName: lastBusiness.business_name,
+    cursorId: lastBusiness.id
+});
+
+// Filter by creation date
+const filteredByDate = await handleVendors.getAllBusinesses({
+    limit: 10,
+    startDate: '2024-01-01T00:00:00Z'
+});
+
+// Filter by status
+const activeBusinesses = await handleVendors.getAllBusinesses({
+    limit: 10,
+    status: 'active'
+});
+```
+
+**Request Parameters (GetAllBusinessesParams):**
+```typescript
+{
+    limit?: number;                // Optional: Results per page (default: 10)
+    cursorBusinessName?: string;   // Optional: Cursor for pagination
+    cursorId?: string;             // Optional: Cursor for pagination
+    startDate?: string;            // Optional: Filter by created_at start (ISO 8601)
+    endDate?: string;              // Optional: Filter by created_at end (ISO 8601)
+    status?: "active" | "suspended" | "pending_activation"; // Optional: Filter by status
+}
+```
+
+**Response Type:**
+```typescript
+{
+    data: CompositeTypes<'business_item_response'>[];
+    isSuccessful: boolean;
+    message: string;
+}
+```
+
+**Business Item Response:**
+```typescript
+{
+    id: string;
+    business_name: string;
+    logo: { url: string; blur_hash?: string } | null;
+    number_of_stores: number;
+    created_at: string;
+    updated_at: string;
+    status: "active" | "suspended" | "pending_activation";
+}
+```
+
+---
+
+### 6. searchBusiness
+
+Searches for businesses using fuzzy text search on business name and address. This operation requires admin authentication and uses PostgreSQL's pg_trgm extension.
+
+```typescript
 const searchBusiness = async (
     params: SearchBusinessParams
 ): Promise<Response<CompositeTypes<'business_item_response'>[]>> => {
@@ -290,419 +586,10 @@ const searchBusiness = async (
         };
     }
 };
-
-/**
- * Get business summary statistics
- * Admin only - requires admin authentication
- */
-const getAllBusinessSummary = async (params: GetAllBusinessSummaryParams = {}): Promise<
-    Response<CompositeTypes<'business_summary_response'> | null>
-> => {
-    try {
-        const { data, error } = await supabase.rpc("get_all_business_summary", {
-            p_status: params.status ?? undefined,
-            p_start_date: params.startDate ?? undefined,
-            p_end_date: params.endDate ?? undefined,
-            p_search_query: params.searchQuery ?? undefined,
-        });
-
-        if (error) throw error;
-
-        return { data, isSuccessful: true, message: "Fetched business summary successfully" };
-    } catch (error) {
-        return {
-            data: null,
-            isSuccessful: false,
-            message: error instanceof Error ? error.message : "Failed to fetch business summary",
-        };
-    }
-};
-
-/**
- * Resend vendor invitation email via edge function
- */
-const resendVendorInvite = async (params: ResendVendorInviteParams): Promise<Response<any>> => {
-    try {
-        const { data, error } = await supabase.functions.invoke("resend-vendor-invite", {
-            body: params,
-        });
-
-        if (error) throw error;
-
-        return { data, isSuccessful: true, message: "Vendor invitation resent successfully" };
-    } catch (error) {
-        return {
-            data: null,
-            isSuccessful: false,
-            message: error instanceof Error ? error.message : "Failed to resend vendor invitation",
-        };
-    }
-};
-
-export const handleVendors = {
-    getOnboardingVendor,
-    completeVendorSignup,
-    addBusiness,
-    addVendor,
-    getAllBusinesses,
-    searchBusiness,
-    getAllBusinessSummary,
-    resendVendorInvite,
-};
 ```
 
-## Add Business
-
-Creates a new business with store and owner vendor. This operation requires super_admin authentication.
-
-### Endpoint
-`POST /functions/v1/add-business`
-
-### Request Body (AddBusinessParams)
-
+**Usage Example:**
 ```typescript
-{
-  business_name: string;
-  business_address?: string;
-  cac_number?: string;
-  tax_id?: string;
-  cac_document_url?: string;
-  store_name: string;
-  store_address?: string;
-  store_city?: string;
-  store_state?: string;
-  store_latitude?: number;
-  store_longitude?: number;
-  store_logo?: {
-    url: string;
-    blur_hash?: string;
-  } | null;
-  store_cover_photo?: any;
-  store_cover_photo_blur_hash?: string;
-  vendor_first_name: string;
-  vendor_last_name: string;
-  vendor_phone_number?: string;
-  vendor_profile_photo?: any;
-  vendor_profile_photo_hash?: string;
-  vendor_email: string;
-  working_hours?: WorkingHour[];
-  is_development?: boolean;
-}
-```
-
-### WorkingHour Format
-
-```typescript
-{
-  day_of_week: DayOfWeek; // enum: monday, tuesday, wednesday, thursday, friday, saturday, sunday
-  opening_time: string;   // format: "HH:mm"
-  closing_time: string;   // format: "HH:mm"
-  is_opened?: boolean;
-}
-```
-
-### Response (AddBusinessResponse)
-
-```typescript
-{
-  success: boolean;
-  businessId: string;
-  storeId: string;
-  vendorUserId: string;
-  onboardingToken: string;
-}
-```
-
-### Usage Example
-
-```typescript
-import { handleVendors } from '@/api/handleVendors';
-
-const result = await handleVendors.addBusiness({
-  business_name: "Example Restaurant",
-  business_address: "123 Main St",
-  store_name: "Downtown Location",
-  store_city: "Lagos",
-  store_state: "Lagos",
-  vendor_first_name: "John",
-  vendor_last_name: "Doe",
-  vendor_email: "john@example.com",
-  working_hours: [
-    {
-      day_of_week: "monday",
-      opening_time: "09:00",
-      closing_time: "22:00",
-      is_opened: true
-    }
-  ]
-});
-
-console.log(result.data.onboardingToken); // Share this with the vendor for onboarding
-```
-
-### Notes
-
-- The `onboardingToken` in the response should be securely shared with the vendor to complete their account setup
-- The vendor will use this token to retrieve their onboarding details and complete signup
-- Store logo and cover photo should be uploaded first using the upload API
-- Working hours are optional but recommended for proper store operations
-
-## Add Vendor
-
-Adds a vendor to an existing business and store. This operation requires business owner or super_admin authentication.
-
-### Endpoint
-`POST /functions/v1/add-vendor`
-
-### Request Body (AddVendorParams)
-
-```typescript
-{
-  vendor_first_name: string;
-  vendor_last_name: string;
-  vendor_phone_number?: string;
-  vendor_profile_photo?: {
-    url: string;
-    blur_hash?: string;
-  } | null;
-  vendor_profile_photo_hash?: string;
-  vendor_email: string;
-  vendor_role?: "owner" | "manager" | "member";
-  business_id: string;
-  store_id: string;
-  is_development?: boolean;
-}
-```
-
-### Response (AddVendorResponse)
-
-```typescript
-{
-  success: boolean;
-  businessId: string;
-  vendorUserId: string;
-  onboardingToken: string;
-}
-```
-
-### Usage Example
-
-```typescript
-import { handleVendors } from '@/api/handleVendors';
-
-const result = await handleVendors.addVendor({
-  vendor_first_name: "Jane",
-  vendor_last_name: "Smith",
-  vendor_email: "jane@example.com",
-  vendor_phone_number: "+2348012345678",
-  vendor_role: "manager",
-  business_id: "abc123-def456",
-  store_id: "store-xyz-789"
-});
-
-if (result.isSuccessful) {
-  console.log(result.data.onboardingToken); // Share this with the vendor for onboarding
-  console.log(result.data.vendorUserId);    // The new vendor's user ID
-}
-```
-
-### Notes
-
-- The `store_id` is required to associate the vendor with a specific store within the business
-- The `onboardingToken` in the response should be securely shared with the vendor to complete their account setup
-- The vendor will use this token to retrieve their onboarding details and complete signup
-- The `vendor_role` determines the level of access the vendor will have (owner, manager, or member)
-- Vendor profile photo should be uploaded first using the upload API
-
-## Get All Businesses
-
-Retrieves a paginated list of all businesses. This operation requires admin authentication.
-
-### Usage Example
-
-```typescript
-import { handleVendors } from '@/api/handleVendors';
-import { Database } from '@/types/database.types';
-
-// Get first page of businesses
-const result = await handleVendors.getAllBusinesses({
-    limit: 10
-});
-
-if (result.isSuccessful) {
-    const businesses = result.data; // Database["public"]["CompositeTypes"]["business_item_response"][]
-    businesses.forEach(business => {
-        console.log(business.business_name);
-        console.log(business.number_of_stores);
-        console.log(business.status);
-    });
-}
-
-// Get next page using cursor
-const lastBusiness = businesses[businesses.length - 1];
-const nextPage = await handleVendors.getAllBusinesses({
-    limit: 10,
-    cursorBusinessName: lastBusiness.business_name,
-    cursorId: lastBusiness.id
-});
-
-// Filter by creation date (businesses created after a specific time)
-const filteredByDate = await handleVendors.getAllBusinesses({
-    limit: 10,
-    startDate: '2024-01-01T00:00:00Z'
-});
-
-// Filter by creation date range
-const filteredByDateRange = await handleVendors.getAllBusinesses({
-    limit: 10,
-    startDate: '2024-01-01T00:00:00Z',
-    endDate: '2024-01-31T23:59:59Z'
-});
-
-// Filter by status
-const activeBusinesses = await handleVendors.getAllBusinesses({
-    limit: 10,
-    status: 'active'
-});
-
-// Combine filters
-const filteredResults = await handleVendors.getAllBusinesses({
-    limit: 10,
-    startDate: '2024-01-01T00:00:00Z',
-    status: 'active'
-});
-```
-
-### Response Type
-
-```typescript
-{
-    data: Database["public"]["CompositeTypes"]["business_item_response"][];
-    isSuccessful: boolean;
-    message: string;
-}
-```
-
-### Business Item Response
-
-```typescript
-{
-    id: string;
-    business_name: string;
-    logo: Database["public"]["CompositeTypes"]["image_type"] | null;
-    number_of_stores: number;
-    created_at: string;
-    updated_at: string;
-    status: "active" | "suspended" | "pending_activation";
-}
-```
-
-### Filter Parameters
-
-- `startDate` (optional): Filter to return businesses created on/after this timestamp (ISO 8601)
-- `endDate` (optional): Filter to return businesses created on/before this timestamp (ISO 8601)
-- `status` (optional): Filter by business status (`"active" | "suspended" | "pending_activation"`)
-
-### Cursor Pagination
-
-- Results are sorted by `business_name` then `id` in ascending order
-- To paginate, pass the `business_name` and `id` of the last item from the previous page as `cursorBusinessName` and `cursorId`
-- The `limit` parameter controls the number of results per page (default: 10)
-- Filters can be combined with cursor pagination for efficient data retrieval
-
-## Get Business Summary
-
-Retrieves summary statistics for all businesses. This operation requires admin authentication.
-
-### Usage Example
-
-```typescript
-import { handleVendors } from '@/api/handleVendors';
-import { CompositeTypes } from '@/types/database.types';
-
-const result = await handleVendors.getAllBusinessSummary({
-    status: 'active',
-    startDate: '2024-01-01T00:00:00Z',
-    endDate: '2024-01-31T23:59:59Z',
-    searchQuery: 'restaurant'
-});
-
-if (result.isSuccessful) {
-    const summary = result.data; // CompositeTypes<'business_summary_response'>
-    console.log('Total businesses:', summary.all_business_count);
-    console.log('Active businesses:', summary.active_business_count);
-    console.log('Suspended businesses:', summary.suspended_business_count);
-    console.log('Pending activation:', summary.pending_activation_business_count);
-}
-```
-
-### Response Type
-
-```typescript
-{
-    data: CompositeTypes<'business_summary_response'> | null;
-    isSuccessful: boolean;
-    message: string;
-}
-```
-
-### Business Summary Response
-
-```typescript
-{
-    all_business_count: number;
-    active_business_count: number;
-    suspended_business_count: number;
-    pending_activation_business_count: number;
-}
-```
-
-## Resend Vendor Invite
-
-Resends a vendor invitation email via the `resend-vendor-invite` edge function. This is useful when a vendor needs to receive their onboarding invitation again.
-
-### Request Body (ResendVendorInviteParams)
-
-```typescript
-{
-  email: string;
-  is_development?: boolean;
-}
-```
-
-### Usage Example
-
-```typescript
-import { handleVendors } from '@/api/handleVendors';
-
-const result = await handleVendors.resendVendorInvite({
-  email: "vendor@example.com",
-  is_development: false
-});
-
-if (result.isSuccessful) {
-  console.log("Vendor invitation resent successfully");
-} else {
-  console.error("Failed to resend invitation:", result.message);
-}
-```
-
-### Notes
-
-- The function requires the app client secret in headers for security
-- Use `is_development: true` when testing in development environment
-- The vendor will receive a new onboarding link via email
-
-## Search Businesses
-
-Searches for businesses using fuzzy text search on business name and address. This operation requires admin authentication and uses PostgreSQL's pg_trgm extension for improved search capabilities.
-
-### Usage Example
-
-```typescript
-import { handleVendors } from '@/api/handleVendors';
-import { Database } from '@/types/database.types';
-
 // Basic search
 const result = await handleVendors.searchBusiness({
     searchQuery: 'restaurant'
@@ -734,49 +621,378 @@ const nextPage = await handleVendors.searchBusiness({
 });
 ```
 
-### Request Parameters (SearchBusinessParams)
-
+**Request Parameters (SearchBusinessParams):**
 ```typescript
 {
-    searchQuery?: string;          // Optional: When omitted/empty, returns all businesses (still supports status/date/pagination)
+    searchQuery?: string;          // Optional: When omitted/empty, returns all businesses
     limit?: number;                // Optional: Results per page (default: 10)
     cursorBusinessName?: string;   // Optional: Cursor for pagination
     cursorId?: string;             // Optional: Cursor for pagination
     startDate?: string;            // Optional: Filter by created_at start (ISO 8601)
     endDate?: string;              // Optional: Filter by created_at end (ISO 8601)
-    status?: Database["public"]["Enums"]["business_status_enum"]; // Optional: Filter by status
+    status?: "active" | "suspended" | "pending_activation"; // Optional: Filter by status
 }
 ```
 
-### Response Type
+**Search Features:**
+- Uses PostgreSQL pg_trgm extension for fuzzy text matching
+- Searches both `business_name` and `business_address` fields
+- Results are ordered by similarity score (most relevant first)
+- Supports partial matches and typo tolerance
+- A similarity threshold of 0.1 is applied to filter out very poor matches
+
+---
+
+### 7. getAllBusinessSummary
+
+Retrieves summary statistics for all businesses. This operation requires admin authentication.
 
 ```typescript
+const getAllBusinessSummary = async (
+    params: GetAllBusinessSummaryParams = {}
+): Promise<Response<CompositeTypes<'business_summary_response'> | null>> => {
+    try {
+        const { data, error } = await supabase.rpc("get_all_business_summary", {
+            p_status: params.status ?? undefined,
+            p_start_date: params.startDate ?? undefined,
+            p_end_date: params.endDate ?? undefined,
+            p_search_query: params.searchQuery ?? undefined,
+        });
+
+        if (error) throw error;
+
+        return { data, isSuccessful: true, message: "Fetched business summary successfully" };
+    } catch (error) {
+        return {
+            data: null,
+            isSuccessful: false,
+            message: error instanceof Error ? error.message : "Failed to fetch business summary",
+        };
+    }
+};
+```
+
+**Usage Example:**
+```typescript
+const result = await handleVendors.getAllBusinessSummary({
+    status: 'active',
+    startDate: '2024-01-01T00:00:00Z',
+    endDate: '2024-01-31T23:59:59Z',
+    searchQuery: 'restaurant'
+});
+
+if (result.isSuccessful) {
+    const summary = result.data;
+    console.log('Total businesses:', summary.all_business_count);
+    console.log('Active businesses:', summary.active_business_count);
+    console.log('Suspended businesses:', summary.suspended_business_count);
+    console.log('Pending activation:', summary.pending_activation_business_count);
+}
+```
+
+**Response Type:**
+```typescript
 {
-    data: Database["public"]["CompositeTypes"]["business_item_response"][];
+    data: {
+        all_business_count: number;
+        active_business_count: number;
+        suspended_business_count: number;
+        pending_activation_business_count: number;
+    } | null;
     isSuccessful: boolean;
     message: string;
 }
 ```
 
-### Search Features
+---
 
-- Uses PostgreSQL pg_trgm extension for fuzzy text matching
-- Searches both `business_name` and `business_address` fields
-- Results are ordered by similarity score (most relevant first), then by business name and id
-- Supports partial matches and typo tolerance
-- Can be combined with date and status filters
-- Supports cursor pagination for large result sets
+### 8. searchVendors
 
-### Notes
+Searches vendors within a specific store using fuzzy text search. This operation requires admin authentication or vendor access to the same store.
 
-- The search uses similarity scoring to rank results by relevance
-- A similarity threshold of 0.1 is applied to filter out very poor matches
-- The `%` operator (trigram matching) provides additional fuzzy matching capabilities
-- For best performance, ensure the pg_trgm extension is enabled in your PostgreSQL database
+```typescript
+const searchVendors = async (
+    params: SearchVendorsParams
+): Promise<Response<CompositeTypes<'vendor_item_response'>[]>> => {
+    try {
+        if (!params.storeId) {
+            throw new Error("Store ID is required");
+        }
 
-### Notes for Admin Functions
+        const { data, error } = await supabase.rpc("search_vendors", {
+            p_store_id: params.storeId,
+            ...(params.searchQuery && { p_search_query: params.searchQuery }),
+            p_limit: params.limit || 10,
+            ...(params.cursorFirstName && { p_cursor_first_name: params.cursorFirstName }),
+            ...(params.cursorId && { p_cursor_id: params.cursorId }),
+            ...(params.startDate && { p_start_date: params.startDate }),
+            ...(params.endDate && { p_end_date: params.endDate }),
+            ...(params.isPendingActivation !== undefined && { p_pending_activation: params.isPendingActivation }),
+        });
 
-- `getAllBusinesses`, `searchBusiness`, and `getAllBusinessSummary` require admin authentication
-- These functions use `security definer` and perform admin-only checks internally
-- They return type-safe responses using CompositeTypes from database.types.ts
-- Handle errors gracefully by checking `isSuccessful` before accessing data
+        if (error) throw error;
+
+        return { data: data || [], isSuccessful: true, message: "Search completed successfully" };
+    } catch (error) {
+        return {
+            data: [],
+            isSuccessful: false,
+            message: error instanceof Error ? error.message : "Failed to search vendors",
+        };
+    }
+};
+```
+
+**Usage Example:**
+```typescript
+// Basic search within a store
+const result = await handleVendors.searchVendors({
+    storeId: 'store-uuid-here',
+    searchQuery: 'john',
+    limit: 10
+});
+
+if (result.isSuccessful) {
+    const vendors = result.data;
+    vendors.forEach(vendor => {
+        console.log(vendor.first_name, vendor.last_name, vendor.role);
+    });
+}
+
+// Filter by pending activation status
+const pendingVendors = await handleVendors.searchVendors({
+    storeId: 'store-uuid-here',
+    isPendingActivation: true,
+    limit: 10
+});
+
+// Paginated search with cursor
+const lastVendor = vendors[vendors.length - 1];
+const nextPage = await handleVendors.searchVendors({
+    storeId: 'store-uuid-here',
+    searchQuery: 'john',
+    limit: 10,
+    cursorFirstName: lastVendor.first_name,
+    cursorId: lastVendor.id
+});
+```
+
+**Request Parameters (SearchVendorsParams):**
+```typescript
+{
+    storeId: string;             // Required: The store to search within
+    searchQuery?: string;        // Optional: Fuzzy search on name/email
+    limit?: number;              // Optional: Results per page (default: 10)
+    cursorFirstName?: string;    // Optional: Cursor for pagination
+    cursorId?: string;           // Optional: Cursor for pagination
+    startDate?: string;          // Optional: Filter by created_at start (ISO 8601)
+    endDate?: string;            // Optional: Filter by created_at end (ISO 8601)
+    isPendingActivation?: boolean; // Optional: Filter by pending activation status
+}
+```
+
+---
+
+### 9. getAllVendorSummary
+
+Retrieves summary statistics for vendors within a specific store. This operation requires admin authentication or vendor access to the same store.
+
+```typescript
+const getAllVendorSummary = async (
+    params: GetAllVendorSummaryParams
+): Promise<Response<CompositeTypes<'vendor_summary_response'> | null>> => {
+    try {
+        if (!params.storeId) {
+            throw new Error("Store ID is required");
+        }
+
+        const { data, error } = await supabase.rpc("get_all_vendor_summary", {
+            p_store_id: params.storeId,
+            ...(params.isPendingActivation !== undefined && { p_pending_activation: params.isPendingActivation }),
+            ...(params.startDate && { p_start_date: params.startDate }),
+            ...(params.endDate && { p_end_date: params.endDate }),
+            ...(params.searchQuery && { p_search_query: params.searchQuery }),
+        });
+
+        if (error) throw error;
+
+        return { data, isSuccessful: true, message: "Fetched vendor summary successfully" };
+    } catch (error) {
+        return {
+            data: null,
+            isSuccessful: false,
+            message: error instanceof Error ? error.message : "Failed to fetch vendor summary",
+        };
+    }
+};
+```
+
+**Usage Example:**
+```typescript
+const result = await handleVendors.getAllVendorSummary({
+    storeId: 'store-uuid-here',
+    isPendingActivation: false,
+    startDate: '2024-01-01T00:00:00Z',
+    endDate: '2024-01-31T23:59:59Z',
+    searchQuery: 'manager'
+});
+
+if (result.isSuccessful) {
+    const summary = result.data;
+    console.log('Total vendors:', summary.all_vendor_count);
+    console.log('Active vendors:', summary.active_vendor_count);
+    console.log('Pending activation:', summary.pending_activation_vendor_count);
+}
+```
+
+**Request Parameters (GetAllVendorSummaryParams):**
+```typescript
+{
+    storeId: string;             // Required: The store to get summary for
+    isPendingActivation?: boolean; // Optional: Filter by pending activation status
+    startDate?: string;          // Optional: Filter by created_at start (ISO 8601)
+    endDate?: string;            // Optional: Filter by created_at end (ISO 8601)
+    searchQuery?: string;        // Optional: Fuzzy search filter
+}
+```
+
+---
+
+### 10. resendVendorInvite
+
+Resends a vendor invitation email via the `resend-vendor-invite` edge function. This is useful when a vendor needs to receive their onboarding invitation again.
+
+```typescript
+const resendVendorInvite = async (params: ResendVendorInviteParams): Promise<Response<any>> => {
+    try {
+        const { data, error } = await supabase.functions.invoke("resend-vendor-invite", {
+            body: params,
+        });
+
+        if (error) throw error;
+
+        return { data, isSuccessful: true, message: "Vendor invitation resent successfully" };
+    } catch (error) {
+        return {
+            data: null,
+            isSuccessful: false,
+            message: error instanceof Error ? error.message : "Failed to resend vendor invitation",
+        };
+    }
+};
+```
+
+**Usage Example:**
+```typescript
+const result = await handleVendors.resendVendorInvite({
+    email: "vendor@example.com",
+    is_development: false
+});
+
+if (result.isSuccessful) {
+    console.log("Vendor invitation resent successfully");
+} else {
+    console.error("Failed to resend invitation:", result.message);
+}
+```
+
+**Notes:**
+- The function requires the app client secret in headers for security
+- Use `is_development: true` when testing in development environment
+- The vendor will receive a new onboarding link via email
+
+---
+
+### 11. exportVendors
+
+Exports vendors to Excel via edge function. This operation requires admin authentication or vendor access to the same store.
+
+```typescript
+const exportVendors = async (params: ExportVendorsParams): Promise<Response<ExportVendorsResponse>> => {
+    try {
+        if (!params.storeId) {
+            throw new Error("Store ID is required");
+        }
+
+        const { data, error } = await supabase.functions.invoke("export-vendors", {
+            body: params,
+        });
+
+        if (error) throw error;
+
+        return { data, isSuccessful: true, message: "Vendors exported successfully" };
+    } catch (error) {
+        return {
+            data: {} as ExportVendorsResponse,
+            isSuccessful: false,
+            message: error instanceof Error ? error.message : "Failed to export vendors",
+        };
+    }
+};
+```
+
+**Usage Example:**
+```typescript
+const result = await handleVendors.exportVendors({
+    storeId: 'store-uuid-here',
+    startDate: '2024-01-01T00:00:00Z',
+    endDate: '2024-01-31T23:59:59Z',
+    isPendingActivation: false,
+    searchQuery: 'manager'
+});
+
+if (result.isSuccessful) {
+    console.log('Export file path:', result.data.path);
+    console.log('Download URL:', result.data.url);
+    // Open or download the file from the URL
+}
+```
+
+**Request Parameters (ExportVendorsParams):**
+```typescript
+{
+    storeId: string;             // Required: The store to export vendors from
+    startDate?: string;          // Optional: Filter by created_at start (ISO 8601)
+    endDate?: string;            // Optional: Filter by created_at end (ISO 8601)
+    isPendingActivation?: boolean; // Optional: Filter by pending activation status
+    searchQuery?: string;        // Optional: Fuzzy search filter
+}
+```
+
+**Response:**
+```typescript
+{
+    path: string;  // Path to the exported file in storage
+    url: string;   // Pre-signed URL to download the file
+}
+```
+
+---
+
+## Export
+
+```typescript
+export const handleVendors = {
+    getOnboardingVendor,
+    completeVendorSignup,
+    addBusiness,
+    addVendor,
+    getAllBusinesses,
+    searchBusiness,
+    getAllBusinessSummary,
+    searchVendors,
+    getAllVendorSummary,
+    resendVendorInvite,
+    exportVendors,
+};
+```
+
+---
+
+## Security Notes
+
+- **Admin Functions**: `getAllBusinesses`, `searchBusiness`, `getAllBusinessSummary`, `searchVendors`, `getAllVendorSummary`, and `exportVendors` require admin authentication
+- **Business Management**: `addBusiness` requires `super_admin` role; `addVendor` requires business owner or `super_admin` role
+- **Onboarding Functions**: `getOnboardingVendor` and `completeVendorSignup` are public but require the app client secret header
+- **Export Functions**: Require appropriate authentication and store access permissions
+- All functions use `security definer` database functions where applicable and perform role checks internally
