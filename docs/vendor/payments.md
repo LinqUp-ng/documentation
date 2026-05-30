@@ -281,18 +281,18 @@ const getPayoutAccountsByStoreId = async (
 };
 
 /**
- * Get the default payout account for a store
- * @param storeId - The ID of the store to get the default payout account for
+ * Get the default payout account for a wallet
+ * @param walletId - The ID of the wallet to get the default payout account for
  * @returns The default payout account or error
  */
-const getDefaultPayoutAccount = async (
-    storeId: string
+const getDefaultPayoutAccountByWalletId = async (
+    walletId: string
 ): Promise<Response<Tables<'payout_accounts'> | null>> => {
     try {
         const { data, error } = await supabase
             .from('payout_accounts')
             .select()
-            .eq('store_id', storeId)
+            .eq('wallet_id', walletId)
             .eq('is_default', true)
             .eq('is_active', true)
             .maybeSingle();
@@ -307,13 +307,13 @@ const getDefaultPayoutAccount = async (
             data,
         };
     } catch (error) {
-        console.error('Error retrieving default payout account:', error);
+        console.error('Error retrieving default payout account by wallet ID:', error);
         throw error;
     }
 };
 
 /**
- * Set a payout account as the default for its store
+ * Set a payout account as the default for its wallet
  * @param payoutAccountId - The ID of the payout account to set as default
  * @returns The updated payout account or error
  */
@@ -411,7 +411,7 @@ export default {
     deletePayoutAccount,
     getPayoutAccountById,
     getPayoutAccountsByStoreId,
-    getDefaultPayoutAccount,
+    getDefaultPayoutAccountByWalletId,
     setDefaultPayoutAccount,
     getWalletByProfileId,
     getWalletByStoreId,
@@ -422,7 +422,7 @@ export default {
 
 ### Link Bank Account for Withdrawals
 
-Vendors link bank accounts to receive payouts. When customers place orders, funds go into the store's wallet. Vendors can then withdraw to their linked payout account.
+Vendors link bank accounts to their stores for withdrawing earnings. When customers place orders, funds accumulate in the store's wallet. Vendors can then initiate withdrawals to their linked payout account.
 
 ### Step 1: Fetch Available Banks
 
@@ -512,21 +512,25 @@ if (result.isSuccessful) {
 }
 ```
 
-### Get Default Payout Account
+### Get Default Payout Account by Wallet
 
-Retrieve the default payout account for a store:
+Retrieve the default payout account for a specific wallet:
 
 ```typescript
 import paymentApi from '@/api/handlePayments';
 
-const result = await paymentApi.getDefaultPayoutAccount(storeId);
+// First get the store wallet
+const walletResult = await paymentApi.getWalletByStoreId(storeId);
+if (walletResult.isSuccessful && walletResult.data) {
+    const walletId = walletResult.data.id;
+    
+    const result = await paymentApi.getDefaultPayoutAccountByWalletId(walletId);
 
-if (result.isSuccessful && result.data) {
-    console.log("Default account:", result.data.account_name);
-    console.log("Bank:", result.data.bank_name);
-    console.log("Account number:", result.data.account_number);
-} else {
-    console.log("No default payout account set");
+    if (result.isSuccessful && result.data) {
+        console.log("Default account:", result.data.account_name);
+        console.log("Bank:", result.data.bank_name);
+        console.log("Account number:", result.data.account_number);
+    }
 }
 ```
 
@@ -576,7 +580,7 @@ if (result.isSuccessful) {
 
 ### Set Default Payout Account
 
-Set an existing payout account as the default for receiving payouts:
+Set an existing payout account as the default for receiving withdrawals:
 
 ```typescript
 import paymentApi from '@/api/handlePayments';
@@ -602,6 +606,7 @@ const result = await paymentApi.getWalletByStoreId(storeId);
 if (result.isSuccessful && result.data) {
     console.log("Store balance:", result.data.balance);
     console.log("Currency:", result.data.currency);
+    console.log("Wallet ID:", result.data.id);
 }
 ```
 
@@ -616,6 +621,23 @@ const result = await paymentApi.getWalletByProfileId(profileId);
 
 if (result.isSuccessful && result.data) {
     console.log("User balance:", result.data.balance);
+}
+```
+
+### Check Store Wallet Balance Before Withdrawal
+
+```typescript
+import paymentApi from '@/api/handlePayments';
+
+async function canWithdraw(storeId: string, amount: number) {
+    const walletResult = await paymentApi.getWalletByStoreId(storeId);
+    
+    if (!walletResult.isSuccessful || !walletResult.data) {
+        throw new Error("Store wallet not found");
+    }
+    
+    const availableBalance = Number(walletResult.data.balance);
+    return availableBalance >= amount;
 }
 ```
 
@@ -655,7 +677,8 @@ The `getBanks` and `validateBankAccounts` functions require a shared secret to e
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | id | string (UUID) | Auto | Primary key |
-| store_id | string (UUID) | Yes | The store this account belongs to |
+| store_id | string (UUID) | Yes | The store this payout account belongs to |
+| wallet_id | string (UUID) | Cond'l | The wallet this account is linked to for withdrawals |
 | account_number | string | Yes | Bank account number |
 | account_name | string | Yes | Verified account name |
 | bank_code | string | Yes | Bank code (e.g., "057" for Zenith Bank) |
