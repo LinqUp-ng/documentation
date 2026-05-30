@@ -4,7 +4,7 @@
 ### 1. Store Identity
 - [ ] **Identity:** `PUT /vendor/stores/:id` - Update logo, cover photo, and address.
 - [ ] **Operations:** `GET /vendor/stores/:id/hours`, `PUT /vendor/stores/:id/hours` (Working days).
-- [ ] **Finance:** `POST /vendor/finance/payout-account` - Link Paystack-compatible account.
+- [ ] **Finance:** `POST /vendor/finance/payout-account` - Link Paystack-compatible account. See [Payment Management](/docs/vendor/payments) for details.
 
 ### 2. Menu Management
 - [ ] **Categorization:** `public.food_categories` - Starters, Mains, Drinks.

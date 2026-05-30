@@ -21,7 +21,7 @@
 
 ## Architecture Overview
 
-RevenueCat sits as a **middle layer** between your app and the stores. It does not own products — those live in Apple and Google's systems. RevenueCat mirrors and abstracts them.
+RevenueCat sits as a **middle layer** between your app and the stores. It does not own products, those live in Apple and Google's systems. RevenueCat mirrors and abstracts them.
 
 ```
 Your Dashboard
@@ -100,7 +100,7 @@ Secret keys can perform: deleting subscribers, granting entitlements, refunding 
 | List active entitlements | `GET /projects/{project_id}/customers/{customer_id}/active_entitlements` | Directly returns what's active |
 | Get subscriber (v1) | `GET /v1/subscribers/{app_user_id}` | Includes full entitlement data |
 | List products | `GET /projects/{project_id}/products` | Paginated |
-| Get product | `GET /projects/{project_id}/products/{product_id}` | — |
+| Get product | `GET /projects/{project_id}/products/{product_id}` |, |
 | List offerings | `GET /projects/{project_id}/offerings` | Paginated |
 | List entitlements | `GET /projects/{project_id}/entitlements` | Paginated |
 | Overview metrics | `GET /projects/{project_id}/metrics/overview` | Revenue, subscribers, etc. |
@@ -112,17 +112,17 @@ Secret keys can perform: deleting subscribers, granting entitlements, refunding 
 | Operation | Endpoint | Notes |
 |---|---|---|
 | Create product (RC level) | `POST /projects/{project_id}/products` | Maps to store product ID |
-| Update product | `PATCH /projects/{project_id}/products/{product_id}` | — |
-| Delete product | `DELETE /projects/{project_id}/products/{product_id}` | — |
-| Create offering | `POST /projects/{project_id}/offerings` | — |
-| Update offering | `PATCH /projects/{project_id}/offerings/{offering_id}` | — |
-| Delete offering | `DELETE /projects/{project_id}/offerings/{offering_id}` | — |
-| Create entitlement | `POST /projects/{project_id}/entitlements` | — |
+| Update product | `PATCH /projects/{project_id}/products/{product_id}` |, |
+| Delete product | `DELETE /projects/{project_id}/products/{product_id}` |, |
+| Create offering | `POST /projects/{project_id}/offerings` |, |
+| Update offering | `PATCH /projects/{project_id}/offerings/{offering_id}` |, |
+| Delete offering | `DELETE /projects/{project_id}/offerings/{offering_id}` |, |
+| Create entitlement | `POST /projects/{project_id}/entitlements` |, |
 | Grant promotional entitlement (v1) | `POST /v1/subscribers/{app_user_id}/entitlements/{entitlement_identifier}/promotional` | Secret key required |
-| Revoke promotional entitlement (v1) | `POST /v1/subscribers/{app_user_id}/entitlements/{entitlement_identifier}/revoke_promotionals` | — |
+| Revoke promotional entitlement (v1) | `POST /v1/subscribers/{app_user_id}/entitlements/{entitlement_identifier}/revoke_promotionals` |, |
 | Create/update app | `POST/PATCH /projects/{project_id}/apps` | v2 only |
 | Delete subscriber (v1) | `DELETE /v1/subscribers/{app_user_id}` | Permanent |
-| Override offering for customer (v1) | `POST /v1/subscribers/{app_user_id}/offerings/{offering_uuid}/override` | — |
+| Override offering for customer (v1) | `POST /v1/subscribers/{app_user_id}/offerings/{offering_uuid}/override` |, |
 | Record purchase (v1) | `POST /v1/receipts` | iOS, Android, Stripe, Roku, Paddle |
 
 #### Pagination
@@ -171,12 +171,12 @@ Response headers on every request:
 
 ### Authentication
 
-Apple uses **JWT (JSON Web Token)** authentication — this is the biggest friction point compared to RevenueCat.
+Apple uses **JWT (JSON Web Token)** authentication, this is the biggest friction point compared to RevenueCat.
 
 You need three things:
-1. **Key ID** — from App Store Connect dashboard
-2. **Issuer ID** — from App Store Connect dashboard
-3. **.p8 private key file** — downloaded once (store it securely, cannot be re-downloaded)
+1. **Key ID**, from App Store Connect dashboard
+2. **Issuer ID**, from App Store Connect dashboard
+3. **.p8 private key file**, downloaded once (store it securely, cannot be re-downloaded)
 
 **Generating the JWT:**
 ```javascript
@@ -211,7 +211,7 @@ Authorization: Bearer YOUR_JWT_TOKEN
 3. Select App Store Connect API → Team Keys
 4. Click Generate API Key
 5. Assign appropriate role (Admin for full access)
-6. Download the `.p8` file immediately — you only get one chance
+6. Download the `.p8` file immediately, you only get one chance
 
 ---
 
@@ -318,8 +318,8 @@ https://androidpublisher.googleapis.com/androidpublisher/v3
 
 > This is a critical concept unique to Google's API.
 
-- **Publishing API** uses an **"edits" / transactional model** — you bundle changes into a draft edit, then commit them all at once. Changes don't take effect until committed.
-- **Subscriptions & In-App Purchases API** takes **immediate effect** — no edits model needed.
+- **Publishing API** uses an **"edits" / transactional model**, you bundle changes into a draft edit, then commit them all at once. Changes don't take effect until committed.
+- **Subscriptions & In-App Purchases API** takes **immediate effect**, no edits model needed.
 
 ---
 
@@ -375,7 +375,7 @@ https://androidpublisher.googleapis.com/androidpublisher/v3
 
 #### Real-Time Developer Notifications (RTDNs)
 
-Google pushes subscription events via **Pub/Sub** — set this up in Play Console to receive webhook-like events:
+Google pushes subscription events via **Pub/Sub**, set this up in Play Console to receive webhook-like events:
 - `SUBSCRIPTION_PURCHASED`
 - `SUBSCRIPTION_RENEWED`
 - `SUBSCRIPTION_CANCELED`
@@ -425,12 +425,12 @@ See per-domain limits in the RevenueCat section above. Use the `Retry-After` hea
 ### App Store Connect
 Apple does not publish exact rate limit numbers but enforces limits. Best practices:
 - Cache responses aggressively
-- Don't poll — use webhooks where available
+- Don't poll, use webhooks where available
 - Exponential backoff on errors
 
 ### Google Play
 Google enforces a daily quota per project. Recommendations:
-- **Cache purchase details server-side** — do not call the API on every user action
+- **Cache purchase details server-side**, do not call the API on every user action
 - **Store subscription expiry locally** and only re-query at/near expiry
 - **Do not publish updates more than once per day** for alpha/beta tracks
 - Request quota increases via Google Cloud Console if needed
@@ -487,25 +487,25 @@ Google enforces a daily quota per project. Recommendations:
 ## Gotchas & Caveats
 
 ### RevenueCat
-- **v2 is incomplete** — the subscriber/entitlement detail you need for some flows is still only in v1. Community members have confirmed that `active_entitlements` may return empty in v2 while v1 returns them correctly.
+- **v2 is incomplete**, the subscriber/entitlement detail you need for some flows is still only in v1. Community members have confirmed that `active_entitlements` may return empty in v2 while v1 returns them correctly.
 - **Secret keys must never be in client-side code.** All write operations from your dashboard should go through your own backend server, which then calls RevenueCat.
 - **Creating a "product" in RevenueCat** only creates a RevenueCat-level mapping. The actual product must already exist in the App Store or Play Store first.
-- **Sandbox vs Production** — some v2 endpoints have an `environment` field; others (like `active_entitlements`) may default to sandbox. Test carefully.
+- **Sandbox vs Production**, some v2 endpoints have an `environment` field; others (like `active_entitlements`) may default to sandbox. Test carefully.
 
 ### Apple App Store Connect
 - **The `.p8` key file can only be downloaded once.** If lost, you must revoke and generate a new key.
 - **JWTs expire in 20 minutes max.** Build token refresh logic into your dashboard.
 - **Not all product changes are instant.** Price changes and some metadata changes require App Store review.
-- **App Store Connect API is a JSON:API spec** — the response structure is nested and relationship-based, which can be confusing. Use an OpenAPI-generated client library where possible.
+- **App Store Connect API is a JSON:API spec**, the response structure is nested and relationship-based, which can be confusing. Use an OpenAPI-generated client library where possible.
 - **Useful trick:** To find which endpoint maps to a UI action, open App Store Connect in your browser and inspect the network traffic in DevTools.
 
 ### Google Play
-- **"Edits" model vs Immediate** — do not confuse the two. Publishing API changes use edits (must be committed); purchase/subscription status API calls take effect immediately.
+- **"Edits" model vs Immediate**, do not confuse the two. Publishing API changes use edits (must be committed); purchase/subscription status API calls take effect immediately.
 - **Service account permissions** must be explicitly granted in Play Console, not just in Google Cloud IAM. Both places need to be configured.
-- **Subscription states are complex:** pending, active, paused, grace period, on hold, canceled, expired — your dashboard UI needs to handle all of these gracefully.
-- **Always cache** — Google strongly recommends server-side caching of purchase tokens and expiry dates. Do not hit their API on every user request.
+- **Subscription states are complex:** pending, active, paused, grace period, on hold, canceled, expired, your dashboard UI needs to handle all of these gracefully.
+- **Always cache**, Google strongly recommends server-side caching of purchase tokens and expiry dates. Do not hit their API on every user request.
 - **New `subscriptionsv2` API** is the current recommended version. The older `purchases.subscriptions` endpoints are being deprecated.
-- **Real-time events via Pub/Sub** — if you want to keep your dashboard live without polling, set up Google Cloud Pub/Sub and configure RTDNs in Play Console.
+- **Real-time events via Pub/Sub**, if you want to keep your dashboard live without polling, set up Google Cloud Pub/Sub and configure RTDNs in Play Console.
 
 ---
 
