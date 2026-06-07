@@ -28,7 +28,12 @@ const getOnboardingVendor = async (token: string): Promise<Response<OnboardingVe
             },
         });
 
-        if (error) throw error;
+        if (error) {
+            const errorBody = await error.context?.json();
+            console.log("Detailed Function Error:", errorBody);
+            throw error;
+        }
+
 
         return { data, isSuccessful: true, message: "Fetched onboarding data" };
     } catch (error) {
@@ -101,7 +106,12 @@ const completeVendorSignup = async (
             },
         });
 
-        if (error) throw error;
+        if (error) {
+            const errorBody = await error.context?.json();
+            console.log("Detailed Function Error:", errorBody);
+            throw error;
+        }
+
 
         return data as CompleteVendorSignupResponse;
     } catch (error) {

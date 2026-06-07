@@ -214,7 +214,12 @@ const sendOTP = async (payload: { email?: string; user_id?: string }) => {
       "x-client-secret": process.env.EXPO_PUBLIC_APP_CLIENT_SECRET ?? "",
     },
   });
-  if (error) throw error;
+  if (error) {
+      const errorBody = await error.context?.json();
+      console.log("Detailed Function Error:", errorBody);
+      throw error;
+  }
+
   return { isSuccessful: true, message: "OTP sent successfully", data };
 };
 

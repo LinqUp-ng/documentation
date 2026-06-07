@@ -207,7 +207,12 @@ const getOnboardingVendor = async (token: string): Promise<Response<OnboardingVe
             },
         });
 
-        if (error) throw error;
+        if (error) {
+            const errorBody = await error.context?.json();
+            console.log("Detailed Function Error:", errorBody);
+            throw error;
+        }
+
 
         return { data, isSuccessful: true, message: "Fetched onboarding data" };
     } catch (error) {
@@ -253,7 +258,12 @@ const completeVendorSignup = async (
             },
         });
 
-        if (error) throw error;
+        if (error) {
+            const errorBody = await error.context?.json();
+            console.log("Detailed Function Error:", errorBody);
+            throw error;
+        }
+
 
         return data as CompleteVendorSignupResponse;
     } catch (error) {
@@ -292,7 +302,12 @@ const addBusiness = async (
             body: params,
         });
 
-        if (error) throw error;
+        if (error) {
+            const errorBody = await error.context?.json();
+            console.log("Detailed Function Error:", errorBody);
+            throw error;
+        }
+
 
         return { data, isSuccessful: true, message: "Business added successfully" };
     } catch (error) {
@@ -391,7 +406,12 @@ const addVendor = async (
             body: params,
         });
 
-        if (error) throw error;
+        if (error) {
+            const errorBody = await error.context?.json();
+            console.log("Detailed Function Error:", errorBody);
+            throw error;
+        }
+
 
         return { data, isSuccessful: true, message: "Vendor added successfully" };
     } catch (error) {
@@ -869,7 +889,12 @@ const resendVendorInvite = async (params: ResendVendorInviteParams): Promise<Res
             body: params,
         });
 
-        if (error) throw error;
+        if (error) {
+            const errorBody = await error.context?.json();
+            console.log("Detailed Function Error:", errorBody);
+            throw error;
+        }
+
 
         return { data, isSuccessful: true, message: "Vendor invitation resent successfully" };
     } catch (error) {
@@ -918,7 +943,12 @@ const exportVendors = async (params: ExportVendorsParams): Promise<Response<Expo
             body: params,
         });
 
-        if (error) throw error;
+        if (error) {
+            const errorBody = await error.context?.json();
+            console.log("Detailed Function Error:", errorBody);
+            throw error;
+        }
+
 
         return { data, isSuccessful: true, message: "Vendors exported successfully" };
     } catch (error) {

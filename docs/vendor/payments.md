@@ -69,7 +69,12 @@ const redeemBookingCode = async (code: string): Promise<Response<any>> => {
             body: { code },
         });
 
-        if (error) throw error;
+        if (error) {
+            const errorBody = await error.context?.json();
+            console.log("Detailed Function Error:", errorBody);
+            throw error;
+        }
+
 
         return { data, isSuccessful: true, message: "Booking code redeemed successfully" };
     } catch (error) {
@@ -99,7 +104,12 @@ const validateBankAccounts = async (
             },
         });
 
-        if (error) throw error;
+        if (error) {
+            const errorBody = await error.context?.json();
+            console.log("Detailed Function Error:", errorBody);
+            throw error;
+        }
+
 
         return { data, isSuccessful: true, message: "Bank account validated successfully" };
     } catch (error) {

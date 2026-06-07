@@ -197,7 +197,12 @@ const getOnboardingAdmin = async (token: string): Promise<Response<OnboardingAdm
             },
         });
 
-        if (error) throw error;
+        if (error) {
+            const errorBody = await error.context?.json();
+            console.log("Detailed Function Error:", errorBody);
+            throw error;
+        }
+
 
         // Check if response contains an error message
         if (data && typeof data === 'object' && 'error' in data) {
@@ -258,7 +263,12 @@ const completeAdminSignup = async (
             },
         });
 
-        if (error) throw error;
+        if (error) {
+            const errorBody = await error.context?.json();
+            console.log("Detailed Function Error:", errorBody);
+            throw error;
+        }
+
 
         return { data, isSuccessful: true, message: "Signup completed successfully" };
     } catch (error) {
@@ -423,7 +433,12 @@ const resendAdminInvite = async (params: ResendAdminInviteParams): Promise<Respo
             body: params,
         });
 
-        if (error) throw error;
+        if (error) {
+            const errorBody = await error.context?.json();
+            console.log("Detailed Function Error:", errorBody);
+            throw error;
+        }
+
 
         return { data, isSuccessful: true, message: "Admin invitation resent successfully" };
     } catch (error) {
@@ -642,7 +657,11 @@ const exportAdmins = async (params: ExportAdminsParams): Promise<Response<{ path
             body: params,
         });
 
-        if (error) throw error;
+        if (error) {
+            const errorBody = await error.context?.json();
+            console.log("Detailed Function Error:", errorBody);
+            throw error;
+        }
 
         return { data, isSuccessful: true, message: "Admins exported successfully" };
     } catch (error) {
