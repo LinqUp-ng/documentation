@@ -1183,25 +1183,150 @@ if (result.isSuccessful && result.data) {
 
 ---
 
+### 16. getAllWallets
+
+Retrieves all wallets across the platform with pagination. Admin role required (super_admin, manager, accountant, or member).
+
+```typescript
+import { supabase } from "@/lib/supabase";
+import { Response } from "@/types/api";
+import { Tables } from "@/types/database.types";
+
+interface GetAllWalletsParams {
+    limit?: number;
+    cursorId?: string;
+    ownerType?: 'user' | 'store' | 'platform' | 'business';
+    is_active?: boolean;
+}
+
+const getAllWallets = async (
+    params: GetAllWalletsParams = {}
+): Promise<Response<Tables<'wallets'>[]>> => {
+    try {
+        const { limit = 20, cursorId, ownerType, is_active } = params;
+
+        let query = supabase
+            .from('wallets')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(limit + 1);
+
+        if (cursorId) {
+            query = query.gt('id', cursorId);
+        }
+
+        if (ownerType) {
+            query = query.eq('owner_type', ownerType);
+        }
+
+        if (is_active !== undefined) {
+            query = query.eq('is_active', is_active);
+        }
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+
+        return {
+            data: data || [],
+            isSuccessful: true,
+            message: "Wallets retrieved successfully"
+        };
+    } catch (error) {
+        return {
+            data: [],
+            isSuccessful: false,
+            message: error instanceof Error ? error.message : "Failed to fetch wallets"
+        };
+    }
+};
+
+const getWalletById = async (
+    walletId: string
+): Promise<Response<Tables<'wallets'> | null>> => {
+    try {
+        const { data, error } = await supabase
+            .from('wallets')
+            .select('*')
+            .eq('id', walletId)
+            .single();
+
+        if (error) throw error;
+
+        return {
+            data,
+            isSuccessful: true,
+            message: "Wallet retrieved successfully"
+        };
+    } catch (error) {
+        return {
+            data: null,
+            isSuccessful: false,
+            message: error instanceof Error ? error.message : "Failed to fetch wallet"
+        };
+    }
+};
+```
+
+**Usage Example:**
+```typescript
+// Get all wallets
+const allWallets = await handleAdmin.getAllWallets({ limit: 50 });
+
+// Get all store wallets
+const storeWallets = await handleAdmin.getAllWallets({ 
+    limit: 20, 
+    ownerType: 'store' 
+});
+
+// Get all active user wallets
+const activeUserWallets = await handleAdmin.getAllWallets({ 
+    limit: 20, 
+    ownerType: 'user',
+    is_active: true 
+});
+
+// Paginated fetch
+const nextPage = await handleAdmin.getAllWallets({
+    limit: 20,
+    cursorId: lastWallet.id
+});
+
+// Get specific wallet
+const wallet = await handleAdmin.getWalletById('wallet-uuid');
+```
+
+**Request Parameters (GetAllWalletsParams):**
+```typescript
+{
+    limit?: number;           // Optional: Results per page (default: 20)
+    cursorId?: string;        // Optional: Cursor for pagination (use id of last item)
+    ownerType?: 'user' | 'store' | 'platform' | 'business'; // Optional: Filter by owner type
+    is_active?: boolean;       // Optional: Filter by active status
+}
+```
+
+**Notes:**
+- RLS policy allows admins to fetch all wallets across the platform
+- Vendors can only fetch wallets for stores they belong to
+- Users can only fetch their own wallet
+
 ## Export
 
 ```typescript
-export const handleVendors = {
-    getOnboardingVendor,
-    completeVendorSignup,
-    addBusiness,
-    addVendor,
-    getAllBusinesses,
-    searchBusiness,
-    getAllBusinessSummary,
-    searchVendors,
-    getAllVendorSummary,
-    resendVendorInvite,
-    exportVendors,
-    getStoreById,
-    getStoresByBusinessId,
-    getVendorById,
-    getBusinessById,
+export const handleAdmin = {
+    addAdmin,
+    getOnboardingAdmin,
+    completeAdminSignup,
+    editAdmin,
+    deactivateAdmin,
+    resendAdminInvite,
+    searchAdmins,
+    getAdminSummary,
+    exportAdmins,
+    getAdminById,
+    getAllWallets,
+    getWalletById,
 };
 ```
 
@@ -1209,7 +1334,7 @@ export const handleVendors = {
 
 ## Security Notes
 
-- **Admin Functions**: `getAllBusinesses`, `searchBusiness`, `getAllBusinessSummary`, `searchVendors`, `getAllVendorSummary`, and `exportVendors` require admin authentication
+- **Admin Functions**: `getAllBusinesses`, `searchBusiness`, `getAllBusinessSummary`, `searchVendors`, `getAllVendorSummary`, `exportVendors`, `getAllWallets`, and `getWalletById` require admin authentication
 - **Business Management**: `addBusiness` requires `super_admin` role; `addVendor` requires business owner or `super_admin` role
 - **Onboarding Functions**: `getOnboardingVendor` and `completeVendorSignup` are public but require the app client secret header
 - **Export Functions**: Require appropriate authentication and store access permissions

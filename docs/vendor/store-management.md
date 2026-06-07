@@ -2,7 +2,7 @@
 *Vendors must prepare their stores and menus before user interaction.*
 
 ### 1. Store Identity
-- [ ] **Create:** `POST /vendor/stores` - Create a new store.
+- [ ] **Create:** `POST /vendor/stores` - Create a new store. **Only business owners can create stores**. The authenticated user is automatically added as a default vendor in the created store.
 
 ```typescript
 import { supabase, Tables } from "@/lib/supabase";

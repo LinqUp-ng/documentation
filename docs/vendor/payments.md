@@ -712,6 +712,157 @@ The `getBanks` and `validateBankAccounts` functions require a shared secret to e
 | is_active | boolean | Yes | Whether wallet is active |
 | created_at | string | Auto | Creation timestamp |
 
+## Unified Wallet API
+
+The `handleWallet.ts` module provides a unified interface for wallet operations:
+
+```typescript
+import { supabase, Tables } from "@/lib/supabase";
+import { Response } from "@/types/api";
+
+interface GetWalletParams {
+    storeId?: string;
+}
+
+/**
+ * Get wallet by store id or get platform wallet
+ * If storeId is provided, returns the store wallet for that store.
+ * Otherwise, returns the platform wallet.
+ */
+const getWallet = async (
+    params: GetWalletParams
+): Promise<Response<Tables<"wallets"> | null>> => {
+    try {
+        const { storeId } = params;
+
+        let query = supabase.from("wallets").select("*");
+
+        if (storeId) {
+            query = query.eq("store_id", storeId).eq("owner_type", "store");
+        } else {
+            query = query.eq("owner_type", "platform");
+        }
+
+        const { data, error } = await query.single();
+
+        if (error) {
+            throw error;
+        }
+
+        return {
+            data: data || null,
+            isSuccessful: true,
+            message: "Wallet retrieved successfully",
+        };
+    } catch (error) {
+        throw error;
+    }
+};
+
+/**
+ * Get user wallet by profile id
+ * @param profileId - The profile ID to get the wallet for
+ * @returns The user wallet or error
+ */
+const getUserWallet = async (
+    profileId: string
+): Promise<Response<Tables<"wallets"> | null>> => {
+    try {
+        const { data, error } = await supabase
+            .from("wallets")
+            .select("*")
+            .eq("profile_id", profileId)
+            .eq("owner_type", "user")
+            .single();
+
+        if (error) {
+            throw error;
+        }
+
+        return {
+            data: data || null,
+            isSuccessful: true,
+            message: "User wallet retrieved successfully",
+        };
+    } catch (error) {
+        throw error;
+    }
+};
+
+/**
+ * Get platform wallet
+ * @returns The platform wallet or error
+ */
+const getPlatformWallet = async (): Promise<Response<Tables<"wallets"> | null>> => {
+    try {
+        const { data, error } = await supabase
+            .from("wallets")
+            .select("*")
+            .eq("owner_type", "platform")
+            .single();
+
+        if (error) {
+            throw error;
+        }
+
+        return {
+            data: data || null,
+            isSuccessful: true,
+            message: "Platform wallet retrieved successfully",
+        };
+    } catch (error) {
+        throw error;
+    }
+};
+
+export default {
+    getWallet,
+    getUserWallet,
+    getPlatformWallet,
+};
+```
+
+### Get Store or Platform Wallet
+
+```typescript
+import walletApi from '@/api/handleWallet';
+
+// Get platform wallet (for platform operations)
+const platformResult = await walletApi.getWallet({});
+if (platformResult.isSuccessful && platformResult.data) {
+    console.log("Platform balance:", platformResult.data.balance);
+}
+
+// Get store wallet (for vendor operations)
+const storeResult = await walletApi.getWallet({ storeId: store.id });
+if (storeResult.isSuccessful && storeResult.data) {
+    console.log("Store balance:", storeResult.data.balance);
+}
+```
+
+### Get User Wallet
+
+```typescript
+import walletApi from '@/api/handleWallet';
+
+const result = await walletApi.getUserWallet(profileId);
+if (result.isSuccessful && result.data) {
+    console.log("User balance:", result.data.balance);
+    console.log("Currency:", result.data.currency);
+}
+```
+
+### Get Platform Wallet Directly
+
+```typescript
+import walletApi from '@/api/handleWallet';
+
+const result = await walletApi.getPlatformWallet();
+if (result.isSuccessful && result.data) {
+    console.log("Platform wallet balance:", result.data.balance);
+}
+```
+
 ## Integration with Store Setup Flow
 
 Integrate payout accounts into the store setup flow:
@@ -743,3 +894,10 @@ async function setupStorePayout(storeId: string, bankDetails: {
 
 - [Store Management](/docs/vendor/store-management) - Store identity and operations
 - [Menu Management](/docs/vendor/menu) - Menu and options management
+
+### API Modules
+
+| Module | Purpose |
+|--------|---------|
+| `handlePayments.ts` | Payout accounts, bank validation, booking redemption |
+| `handleWallet.ts` | Wallet retrieval (store, user, platform) |
